@@ -1,13 +1,20 @@
 import React, { useState } from 'react';
+import { useIPC } from '../../hooks/useIPC';
 
 function ChatInput() {
   const [input, setInput] = useState('');
+  const { sendMessage } = useIPC();
 
-  // Does nothing in M2 - just updates local state
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // No-op for now - IPC in M3
-    console.log('Would send:', input);
+
+    if (!input.trim()) return;
+
+    // Send via IPC
+    await sendMessage(input);
+
+    // Clear input
+    setInput('');
   };
 
   return (

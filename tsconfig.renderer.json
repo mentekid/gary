@@ -8,6 +8,6 @@
     "moduleResolution": "bundler",
     "outDir": "./dist/renderer"
   },
-  "include": ["src/renderer/**/*"],
+  "include": ["src/renderer/**/*", "src/common/**/*"],
   "exclude": ["node_modules"]
 }

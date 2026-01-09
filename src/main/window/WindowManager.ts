@@ -11,8 +11,7 @@ export class WindowManager {
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
-        // Future extension point for preload script (Milestone 3):
-        // preload: path.join(__dirname, '../preload/preload.js'),
+        preload: path.join(__dirname, '../../preload/preload/preload.js'),
       },
     });
 
@@ -21,7 +20,7 @@ export class WindowManager {
       await this.mainWindow.loadURL('http://localhost:5173');
       this.mainWindow.webContents.openDevTools();
     } else {
-      const htmlPath = path.join(__dirname, '../renderer/index.html');
+      const htmlPath = path.join(__dirname, '../../renderer/index.html');
       await this.mainWindow.loadFile(htmlPath);
     }
 

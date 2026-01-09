@@ -1,11 +1,18 @@
 import { app, BrowserWindow } from 'electron';
 import { WindowManager } from './window/WindowManager';
+import { registerIpcHandlers, unregisterIpcHandlers } from './ipc/handlers';
 
 const windowManager = new WindowManager();
 
-// Create window when app is ready
+// Register IPC handlers and create window when app is ready
 app.on('ready', async () => {
+  registerIpcHandlers();
   await windowManager.createWindow();
+});
+
+// Clean up handlers on quit
+app.on('will-quit', () => {
+  unregisterIpcHandlers();
 });
 
 // Quit when all windows are closed (except on macOS)

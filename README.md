@@ -2,76 +2,89 @@
 
 Gary is an AI assistant designed to help Dungeon Masters for D&D 5e create rich, fun adventures.
 
-## Milestone 1: Electron Hello World ✓
+## Development
 
-This milestone establishes the basic Electron application with TypeScript.
+### Prerequisites
+- Node.js 20+
+- npm
 
-### Project Structure
+### Setup
+```bash
+npm install
+```
+
+### Running in Development Mode
+
+1. Start the dev watchers (compiles main, preload, and renderer in watch mode):
+```bash
+npm run dev
+```
+
+2. In a separate terminal, start Electron:
+```bash
+npm run start:dev
+```
+
+The Vite dev server will run on `http://localhost:5173` (or next available port if 5173 is in use).
+
+### Building for Production
+
+```bash
+npm run build
+```
+
+This compiles all three processes:
+- Main process → `dist/main/`
+- Preload script → `dist/preload/`
+- Renderer process → `dist/renderer/`
+
+### Running Production Build
+
+```bash
+npm start
+```
+
+### Available Scripts
+
+- `npm run dev` - Start all dev watchers (main, preload, renderer)
+- `npm run start:dev` - Run Electron in development mode
+- `npm run build` - Build all processes for production
+- `npm start` - Run production build
+- `npm run build:main` - Build only main process
+- `npm run build:preload` - Build only preload script
+- `npm run build:renderer` - Build only renderer process
+
+## Project Structure
 
 ```
 gary/
 ├── src/
-│   └── main/              # Main process (Node.js)
-│       ├── index.ts       # Application entry point
-│       └── window/
-│           └── WindowManager.ts  # Window management
-├── dist/
-│   └── main/              # Compiled JavaScript output
-│       ├── index.html    # Static HTML (copied by build)
-│       ├── index.js      # Compiled entry point
-│       └── window/       # Compiled window manager
-├── index.html            # Static HTML source
-├── package.json          # Project metadata and dependencies
-├── tsconfig.json         # Base TypeScript configuration
-└── tsconfig.main.json    # Main process TypeScript config
+│   ├── main/           # Electron main process
+│   │   ├── index.ts
+│   │   ├── window/     # Window management
+│   │   └── ipc/        # IPC handlers
+│   ├── preload/        # Preload scripts (contextBridge)
+│   ├── renderer/       # React UI
+│   │   ├── components/
+│   │   ├── store/      # Zustand state management
+│   │   └── hooks/
+│   └── common/         # Shared types
+├── dist/               # Compiled output
+└── index.html          # HTML entry point
 ```
 
-### Development Setup
+## Milestones
 
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+### Milestone 1: Electron Hello World ✓
+Basic Electron application with TypeScript.
 
-2. **Build the application:**
-   ```bash
-   npm run build
-   ```
+### Milestone 2: React UI ✓
+React + Vite renderer process with Tailwind CSS.
 
-3. **Run the application:**
-   ```bash
-   npm start
-   ```
-
-4. **Development mode (watch):**
-   ```bash
-   npm run dev
-   ```
-   Then in another terminal:
-   ```bash
-   electron dist/main/index.js
-   ```
-
-### What's Included
-
-- **Electron 28**: Desktop application framework
-- **TypeScript**: Type-safe code with ES2022 features
-- **WindowManager**: Extensible window management class
-- **Security**: CSP headers and contextIsolation enabled
-
-### Expected Behavior
-
-When you run `npm start`, an Electron window should open displaying:
-- A centered "Hello from Gary! 🎲" message
-- Purple gradient background
-- Smooth fade-in animation
-- Window can be closed normally (close button, Cmd+Q, Alt+F4)
+### Milestone 3: IPC Communication (In Progress)
+Echo server with IPC bridge for renderer ↔ main process communication.
 
 ### What's Next
-
-Future milestones will add:
-- **M2**: React UI with Vite
-- **M3**: IPC communication with preload script
 - **M4**: File system integration for Obsidian vaults
 - **M5+**: Agent SDK integration and custom tools
 
@@ -79,24 +92,10 @@ Future milestones will add:
 
 ### Architecture Decisions
 
-- **Module System**: CommonJS (standard for Electron main process)
-- **Build Tool**: Native TypeScript compiler (tsc)
-- **Directory Structure**: `src/main/` prepared for future `renderer/` and `preload/`
-- **Security**: contextIsolation enabled, nodeIntegration disabled
-
-### TypeScript Configuration
-
-The project uses a hierarchical TypeScript configuration:
-- `tsconfig.json`: Base configuration with shared settings
-- `tsconfig.main.json`: Main process specific settings (extends base)
-- Future: `tsconfig.renderer.json` for React (M2), `tsconfig.preload.json` for IPC bridge (M3)
-
-### Window Management
-
-The `WindowManager` class is designed to be extended:
-- Currently loads static HTML from project root
-- Ready for preload script integration (M3)
-- Will support Vite dev server in development mode (M2)
+- **Module System**: CommonJS for main/preload, ESNext for renderer
+- **Build Tools**: TypeScript compiler (tsc) for main/preload, Vite for renderer
+- **Security**: contextIsolation enabled, nodeIntegration disabled, contextBridge for IPC
+- **State Management**: Zustand for React state
 
 ## License
 

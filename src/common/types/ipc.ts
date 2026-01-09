@@ -9,10 +9,25 @@ export interface Message {
 // IPC communication types
 export interface UserMessagePayload {
   text: string;
+  history?: Message[]; // Optional conversation context
 }
 
 export interface AssistantMessagePayload {
   text: string;
+}
+
+// Agent streaming response types
+export interface AgentQueryResponse {
+  type: 'chunk' | 'done' | 'error';
+  text?: string;
+  fullText?: string;
+  error?: string;
+}
+
+// File state update event
+export interface FileStateUpdate {
+  filePath: string; // Relative path
+  state: import('./vault').FileState;
 }
 
 // Vault-related IPC types
@@ -35,7 +50,9 @@ export interface ListDirectoryResponse {
 
 // IPC API exposed to renderer
 export interface IpcApi {
-  sendMessage: (message: UserMessagePayload) => Promise<AssistantMessagePayload>;
+  sendMessage: (message: UserMessagePayload) => void;
+  onAgentResponse: (callback: (response: AgentQueryResponse) => void) => () => void;
   selectVault: () => Promise<SelectVaultResponse>;
   listDirectory: (request: ListDirectoryRequest) => Promise<ListDirectoryResponse>;
+  onFileStateUpdate: (callback: (update: FileStateUpdate) => void) => () => void;
 }

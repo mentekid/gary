@@ -9,21 +9,30 @@ import {
 } from '../../common/types/ipc';
 import { fileSystemManager } from '../vault/FileSystemManager';
 import { vaultValidator } from '../vault/VaultValidator';
+import { agentController } from '../agent/AgentController';
+import { fileStateTracker } from '../vault/FileStateTracker';
 
 export function registerIpcHandlers() {
-  // Echo handler - returns "You said: {message}"
-  ipcMain.handle(
+  // Agent streaming handler - M5
+  ipcMain.on(
     IPC_EVENTS.SEND_MESSAGE,
-    async (_event, payload: UserMessagePayload): Promise<AssistantMessagePayload> => {
-      // Simple echo for M3 - will be replaced with agent in M5
-      const response: AssistantMessagePayload = {
-        text: `You said: ${payload.text}`,
-      };
+    async (event, payload: UserMessagePayload) => {
+      try {
+        const queryRequest = {
+          message: payload.text,
+          conversationHistory: payload.history || [],
+        };
 
-      // Simulate slight delay to feel more realistic
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      return response;
+        // Stream responses back to renderer
+        for await (const chunk of agentController.query(queryRequest)) {
+          event.sender.send(IPC_EVENTS.AGENT_RESPONSE, chunk);
+        }
+      } catch (error: any) {
+        event.sender.send(IPC_EVENTS.AGENT_RESPONSE, {
+          type: 'error',
+          error: error.message || 'Failed to query agent',
+        });
+      }
     }
   );
 
@@ -51,6 +60,9 @@ export function registerIpcHandlers() {
 
         // Set vault path in FileSystemManager
         fileSystemManager.setVaultPath(vaultPath);
+
+        // Clear file states from previous vault
+        fileStateTracker.clear();
 
         return {
           success: true,
@@ -91,7 +103,7 @@ export function registerIpcHandlers() {
 }
 
 export function unregisterIpcHandlers() {
-  ipcMain.removeHandler(IPC_EVENTS.SEND_MESSAGE);
+  ipcMain.removeAllListeners(IPC_EVENTS.SEND_MESSAGE);
   ipcMain.removeHandler(IPC_EVENTS.SELECT_VAULT);
   ipcMain.removeHandler(IPC_EVENTS.LIST_DIRECTORY);
 }

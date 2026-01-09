@@ -1,7 +1,8 @@
 import React from 'react';
 import { Tree, NodeRendererProps } from 'react-arborist';
 import { useVaultStore } from '../../store/vaultStore';
-import { TreeNode } from '../../../common/types/vault';
+import { TreeNode, FileState } from '../../../common/types/vault';
+import { FileStateIcon } from './FileStateIcon';
 
 // Simple SVG icons as components
 function FolderIcon({ isOpen }: { isOpen: boolean }) {
@@ -52,7 +53,9 @@ function FileIcon({ extension }: { extension?: string }) {
 
 // Custom node renderer for the tree
 function Node({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
+  const fileStates = useVaultStore((state) => state.fileStates);
   const isDirectory = node.data.type === 'directory';
+  const fileState = fileStates.get(node.data.path) || FileState.NOT_ACCESSED;
 
   return (
     <div
@@ -93,6 +96,9 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
       ) : (
         <FileIcon extension={node.data.extension} />
       )}
+
+      {/* File state icon (only for files) */}
+      {!isDirectory && <FileStateIcon state={fileState} />}
 
       {/* Name */}
       <span className={`text-sm ${isDirectory ? 'text-white' : 'text-gray-300'}`}>

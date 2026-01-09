@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { TreeNode, FileEntry } from '../../common/types/vault';
+import { TreeNode, FileEntry, FileState } from '../../common/types/vault';
 
 interface VaultState {
   // Vault metadata
@@ -13,6 +13,9 @@ interface VaultState {
   // File tree data
   fileTree: TreeNode[];
 
+  // File access states
+  fileStates: Map<string, FileState>;
+
   // Errors and warnings
   error: string | null;
   warning: string | null;
@@ -20,6 +23,7 @@ interface VaultState {
   // Actions
   selectVault: () => Promise<void>;
   loadFileTree: () => Promise<void>;
+  updateFileState: (path: string, state: FileState) => void;
   clearError: () => void;
 }
 
@@ -86,6 +90,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   isLoadingVault: false,
   isLoadingTree: false,
   fileTree: [],
+  fileStates: new Map(),
   error: null,
   warning: null,
 
@@ -152,6 +157,14 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         error: `Failed to load file tree: ${err.message}`,
       });
     }
+  },
+
+  updateFileState: (path, state) => {
+    set((prevState) => {
+      const newStates = new Map(prevState.fileStates);
+      newStates.set(path, state);
+      return { fileStates: newStates };
+    });
   },
 
   clearError: () => {

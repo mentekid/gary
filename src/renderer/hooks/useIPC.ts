@@ -1,59 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback } from 'react';
 import { useChatStore } from '../store/chatStore';
 import type { Message } from '../../common/types/ipc';
 
+// Note: The streaming listener is set up once in App.tsx via useAgentResponseListener
+// This hook just provides the sendMessage function and isStreaming state
 export function useIPC() {
   const addMessage = useChatStore((state) => state.addMessage);
-  const updateMessage = useChatStore((state) => state.updateMessage);
-
-  const [isStreaming, setIsStreaming] = useState(false);
-  const currentMessageRef = useRef<string>('');
-  const currentMessageIdRef = useRef<string | null>(null);
-
-  // Subscribe to streaming responses
-  useEffect(() => {
-    const cleanup = window.ipc.onAgentResponse((response) => {
-      if (response.type === 'chunk') {
-        // Accumulate chunks
-        currentMessageRef.current += response.text || '';
-
-        if (!currentMessageIdRef.current) {
-          // Create new message
-          const msgId = `assistant-${Date.now()}`;
-          currentMessageIdRef.current = msgId;
-          addMessage({
-            id: msgId,
-            role: 'assistant',
-            content: currentMessageRef.current,
-            timestamp: Date.now(),
-          });
-        } else {
-          // Update existing message
-          updateMessage(currentMessageIdRef.current, {
-            content: currentMessageRef.current,
-          });
-        }
-      } else if (response.type === 'done') {
-        // Finalize message
-        setIsStreaming(false);
-        currentMessageRef.current = '';
-        currentMessageIdRef.current = null;
-      } else if (response.type === 'error') {
-        // Handle error
-        setIsStreaming(false);
-        addMessage({
-          id: `error-${Date.now()}`,
-          role: 'assistant',
-          content: `Error: ${response.error}`,
-          timestamp: Date.now(),
-        });
-        currentMessageRef.current = '';
-        currentMessageIdRef.current = null;
-      }
-    });
-
-    return cleanup;
-  }, [addMessage, updateMessage]);
+  const isStreaming = useChatStore((state) => state.isStreaming);
 
   const sendMessage = useCallback((text: string) => {
     // Add user message optimistically
@@ -69,7 +22,7 @@ export function useIPC() {
     const history = useChatStore.getState().messages;
 
     // Send to main process
-    setIsStreaming(true);
+    useChatStore.getState().setIsStreaming(true);
     window.ipc.sendMessage({ text, history });
   }, [addMessage]);
 

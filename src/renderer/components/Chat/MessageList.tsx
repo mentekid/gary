@@ -1,8 +1,16 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useChatStore } from '../../store/chatStore';
 
 function MessageList() {
   const messages = useChatStore((state) => state.messages);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   return (
     <div className="px-6 py-4 space-y-4">
@@ -27,11 +35,20 @@ function MessageList() {
               <div className="text-sm mb-1 font-semibold opacity-70">
                 {message.role === 'user' ? 'You' : 'Gary'}
               </div>
-              <div className="text-base">{message.content}</div>
+              <div className="text-base prose prose-invert prose-sm max-w-none">
+                {message.role === 'user' ? (
+                  <div className="whitespace-pre-wrap">{message.content}</div>
+                ) : (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {message.content}
+                  </ReactMarkdown>
+                )}
+              </div>
             </div>
           </div>
         ))
       )}
+      <div ref={messagesEndRef} />
     </div>
   );
 }

@@ -101,7 +101,10 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
       {!isDirectory && <FileStateIcon state={fileState} />}
 
       {/* Name */}
-      <span className={`text-sm ${isDirectory ? 'text-white' : 'text-gray-300'}`}>
+      <span
+        className={`text-sm truncate ${isDirectory ? 'text-white' : 'text-gray-300'}`}
+        title={node.data.name}
+      >
         {node.data.name}
       </span>
     </div>

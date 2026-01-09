@@ -76,6 +76,12 @@ export class AgentController {
           break;
         }
 
+        // Add spacing after text blocks when there's tool use
+        // This creates separation between "thinking" messages
+        if (textContent.length > 0) {
+          yield { type: 'chunk', text: '\n\n' };
+        }
+
         // Execute tools and continue conversation
         const toolResults: Anthropic.MessageParam = {
           role: 'user',

@@ -16,13 +16,13 @@ export class WindowManager {
       },
     });
 
-    // Load the index.html file from dist/
-    const htmlPath = path.join(__dirname, '../index.html');
-    await this.mainWindow.loadFile(htmlPath);
-
-    // Open DevTools in development (optional)
+    // Load Vite dev server in development, built files in production
     if (process.env.NODE_ENV === 'development') {
+      await this.mainWindow.loadURL('http://localhost:5173');
       this.mainWindow.webContents.openDevTools();
+    } else {
+      const htmlPath = path.join(__dirname, '../renderer/index.html');
+      await this.mainWindow.loadFile(htmlPath);
     }
 
     // Handle window close

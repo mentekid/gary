@@ -4,9 +4,14 @@
   "description": "Gary - Dungeon Master Assistant Agent for D&D 5e",
   "main": "dist/main/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.main.json && cp index.html dist/main/",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
+    "build": "npm run build:main && npm run build:renderer",
+    "dev:main": "tsc -p tsconfig.main.json --watch",
+    "dev:renderer": "vite",
+    "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "start": "npm run build && electron dist/main/index.js",
-    "dev": "tsc -p tsconfig.main.json --watch"
+    "start:dev": "NODE_ENV=development electron dist/main/index.js"
   },
   "keywords": [
     "electron",
@@ -17,12 +22,22 @@
   "author": "Yannis Mentekidis",
   "license": "MIT",
   "dependencies": {
-    "electron": "^28.0.0"
+    "electron": "^28.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.0",
+    "concurrently": "^8.2.0",
     "electron-builder": "^24.0.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
     "ts-node": "^10.9.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0"
   }
 }

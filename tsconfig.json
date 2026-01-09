@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "jsx": "react",
+    "jsx": "react",
     "target": "ES2022",
     "module": "commonjs",
     "lib": ["ES2022"],

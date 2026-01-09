@@ -1,14 +1,16 @@
-import React from 'react';
-import ChatPane from './components/Chat/ChatPane';
+import React, { useEffect } from 'react';
+import { MainLayout } from './components/Layout/MainLayout';
+import { useVaultStore } from './store/vaultStore';
 
 function App() {
-  return (
-    <div className="flex h-screen bg-gray-900">
-      <div className="flex-1 flex flex-col">
-        <ChatPane />
-      </div>
-    </div>
-  );
+  const selectVault = useVaultStore((state) => state.selectVault);
+
+  // Trigger vault selection on mount
+  useEffect(() => {
+    selectVault();
+  }, [selectVault]);
+
+  return <MainLayout />;
 }
 
 export default App;

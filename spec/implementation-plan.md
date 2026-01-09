@@ -191,24 +191,24 @@ handle('user-message', (message) => {
 
 ### Milestone 4: File System Integration (no agent)
 
-**Goal**: UI can browse vault and read files via IPC
+**Goal**: Vault selection and file tree display via IPC
 
 **Scope**:
 - Add vault selection dialog (opens on app start)
 - File browser sidebar shows real directory tree
 - Click directory → expand/collapse
-- Click file → read content → show in a preview pane (not chat)
+- NO file preview/rendering - users can open files in Obsidian
 - NO agent yet, just testing file system access via IPC
+- FileSystemManager has read capability (for future use by agent)
 
 **Files to Create**:
-1. `src/main/vault/FileSystemManager.ts` - File operations (list, read)
+1. `src/main/vault/FileSystemManager.ts` - File operations (list, read, write placeholder)
 2. `src/main/vault/VaultValidator.ts` - Check for CAMPAIGN.md (just log warning for now)
-3. `src/main/ipc/handlers.ts` - Add handlers for: select-vault, list-directory, read-file
+3. `src/main/ipc/handlers.ts` - Add handlers for: select-vault, list-directory
 4. `src/renderer/components/FileBrowser/FileTree.tsx` - Tree UI with react-arborist
-5. `src/renderer/components/FileBrowser/FilePreview.tsx` - Shows file content
-6. `src/renderer/components/Layout/MainLayout.tsx` - Layout with sidebar + main content
-7. `src/renderer/store/vaultSlice.ts` - Zustand store for vault state
-8. `src/common/types/vault.ts` - Vault and file types
+5. `src/renderer/components/Layout/MainLayout.tsx` - Layout with sidebar + chat area
+6. `src/renderer/store/vaultSlice.ts` - Zustand store for vault state
+7. `src/common/types/vault.ts` - Vault and file types
 
 **Package.json additions**:
 - react-arborist (file tree)
@@ -217,15 +217,16 @@ handle('user-message', (message) => {
 **IPC Handlers**:
 - `select-vault` → open file dialog → return vault path
 - `list-directory` → return array of files/folders
-- `read-file` → return file content
+- (read-file handler will be added later when agent needs it)
 
 **Testing**:
 1. App opens, select vault dialog appears
-2. Choose a directory
-3. File tree populates
-4. Click a markdown file → content appears in preview pane
+2. Choose a directory (can use spec/mock-vault from tests)
+3. File tree populates showing directory structure
+4. Can expand/collapse folders
+5. Tree renders markdown files and folders correctly
 
-**Done When**: Can browse real vault and read files (no agent involved)
+**Done When**: Can select vault and see full directory tree (no file preview needed)
 
 ---
 

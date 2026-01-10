@@ -192,6 +192,14 @@ async function writeTool(
   context?: ToolExecutionContext
 ): Promise<string> {
   try {
+    // Debug logging for content tracking
+    console.log('[WRITE_TOOL] Called with:', {
+      path,
+      contentLength: content?.length || 0,
+      contentPreview: content?.substring(0, 100) || '(empty)',
+      hasContext: !!context,
+    });
+
     // Check if file exists
     const fileExists = await fileSystemManager.fileExists(path);
 
@@ -212,12 +220,22 @@ async function writeTool(
       // Generate unique tool use ID (will be provided by agent controller)
       const toolUseId = `write_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-      context.requestApproval({
+      const approvalRequest = {
         toolUseId,
         filePath: path,
         beforeContent,
         afterContent: content,
+      };
+
+      console.log('[WRITE_TOOL] Creating approval request:', {
+        toolUseId,
+        filePath: path,
+        beforeContentLength: beforeContent?.length || 0,
+        afterContentLength: approvalRequest.afterContent?.length || 0,
+        afterContentPreview: approvalRequest.afterContent?.substring(0, 100) || '(empty)',
       });
+
+      context.requestApproval(approvalRequest);
 
       // Return marker - agent controller will handle approval
       return '__APPROVAL_PENDING__';
@@ -245,6 +263,14 @@ export async function completeWrite(
   approved: boolean,
   feedback?: string
 ): Promise<string> {
+  console.log('[COMPLETE_WRITE] Called with:', {
+    path,
+    contentLength: content?.length || 0,
+    contentPreview: content?.substring(0, 100) || '(empty)',
+    approved,
+    feedback,
+  });
+
   if (!approved) {
     return `Write operation rejected by user. Feedback: ${feedback || 'No feedback provided'}`;
   }
@@ -256,8 +282,14 @@ export async function completeWrite(
     // Mark file as modified
     fileStateTracker.markModified(path);
 
+    console.log('[COMPLETE_WRITE] Successfully wrote file:', {
+      path,
+      bytesWritten,
+    });
+
     return `Successfully wrote ${bytesWritten} bytes to ${path}`;
   } catch (error: any) {
+    console.error('[COMPLETE_WRITE] Error writing file:', error);
     return `Error writing file: ${error.message}`;
   }
 }

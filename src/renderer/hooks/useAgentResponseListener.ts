@@ -55,6 +55,16 @@ export function useAgentResponseListener(
         currentMessageIdRef.current = null;
       } else if (response.type === 'approval_required') {
         // M8: Handle approval request
+        console.log('[AGENT_RESPONSE_LISTENER] Received approval_required:', {
+          hasRequest: !!response.approvalRequest,
+          request: response.approvalRequest ? {
+            toolUseId: response.approvalRequest.toolUseId,
+            filePath: response.approvalRequest.filePath,
+            beforeContentLength: response.approvalRequest.beforeContent?.length || 0,
+            afterContentLength: response.approvalRequest.afterContent?.length || 0,
+            afterContentPreview: response.approvalRequest.afterContent?.substring(0, 100) || '(empty)',
+          } : null,
+        });
         if (onApprovalRequest && response.approvalRequest) {
           onApprovalRequest(response.approvalRequest);
         }

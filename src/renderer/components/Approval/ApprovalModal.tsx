@@ -11,11 +11,29 @@ function ApprovalModal({ request, onApprove, onReject }: ApprovalModalProps) {
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [feedback, setFeedback] = useState('');
 
+  // Debug logging for approval modal
+  React.useEffect(() => {
+    console.log('[APPROVAL_MODAL] Rendering with request:', {
+      toolUseId: request.toolUseId,
+      filePath: request.filePath,
+      beforeContentLength: request.beforeContent?.length || 0,
+      afterContentLength: request.afterContent?.length || 0,
+      afterContentPreview: request.afterContent?.substring(0, 100) || '(empty)',
+      isNewFile: request.beforeContent === null,
+    });
+  }, [request]);
+
   const handleReject = () => {
     if (!feedback.trim()) {
       return; // Feedback is required
     }
+    console.log('[APPROVAL_MODAL] Rejecting with feedback:', feedback);
     onReject(feedback);
+  };
+
+  const handleApproveClick = () => {
+    console.log('[APPROVAL_MODAL] Approving write');
+    onApprove();
   };
 
   const isNewFile = request.beforeContent === null;
@@ -76,7 +94,7 @@ function ApprovalModal({ request, onApprove, onReject }: ApprovalModalProps) {
                 Reject
               </button>
               <button
-                onClick={onApprove}
+                onClick={handleApproveClick}
                 className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
               >
                 Approve

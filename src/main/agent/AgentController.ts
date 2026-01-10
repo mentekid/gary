@@ -258,6 +258,19 @@ export class AgentController {
         for (const block of response.content) {
           if (block.type === 'tool_use') {
             try {
+              // Debug logging for tool calls
+              console.log('[AGENT_CONTROLLER] Tool use:', {
+                toolName: block.name,
+                toolUseId: block.id,
+                input: block.name === 'write'
+                  ? {
+                      path: (block.input as any).path,
+                      contentLength: (block.input as any).content?.length || 0,
+                      contentPreview: (block.input as any).content?.substring(0, 100) || '(empty)',
+                    }
+                  : block.input,
+              });
+
               // Create execution context for approval workflow (M8)
               const context = new ToolExecutionContext();
               const result = await executeToolCall(block.name, block.input, context);
@@ -267,16 +280,30 @@ export class AgentController {
                 // Use actual tool use ID from API
                 context.approvalRequest.toolUseId = block.id;
 
+                console.log('[AGENT_CONTROLLER] Approval needed:', {
+                  toolUseId: block.id,
+                  filePath: context.approvalRequest.filePath,
+                  afterContentLength: context.approvalRequest.afterContent?.length || 0,
+                  afterContentPreview: context.approvalRequest.afterContent?.substring(0, 100) || '(empty)',
+                });
+
                 // Yield approval_required to renderer
                 yield {
                   type: 'approval_required',
                   approvalRequest: context.approvalRequest,
                 };
 
+                console.log('[AGENT_CONTROLLER] Waiting for user approval...');
+
                 // Wait for user approval response
                 const approvalResponse = await approvalManager.requestApproval(
                   context.approvalRequest
                 );
+
+                console.log('[AGENT_CONTROLLER] Received approval response:', {
+                  approved: approvalResponse.approved,
+                  feedback: approvalResponse.feedback,
+                });
 
                 // Complete write based on approval
                 const finalResult = await completeWrite(
@@ -301,6 +328,7 @@ export class AgentController {
                 });
               }
             } catch (error: any) {
+              console.error('[AGENT_CONTROLLER] Tool execution error:', error);
               (toolResults.content as any[]).push({
                 type: 'tool_result',
                 tool_use_id: block.id,

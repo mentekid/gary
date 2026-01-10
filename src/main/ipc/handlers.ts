@@ -106,6 +106,11 @@ export function registerIpcHandlers() {
   ipcMain.on(
     IPC_EVENTS.APPROVAL_RESPONSE,
     (_event, response: ApprovalResponse) => {
+      console.log('[IPC_HANDLER] Received approval response:', {
+        toolUseId: response.toolUseId,
+        approved: response.approved,
+        feedback: response.feedback,
+      });
       approvalManager.handleApprovalResponse(response);
     }
   );

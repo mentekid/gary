@@ -2,7 +2,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { AgentQueryRequest } from './types';
 import type { AgentQueryResponse } from '../../common/types/ipc';
 import { SYSTEM_PROMPT_M6 } from './prompts/systemPrompt';
-import { tools, executeToolCall } from './tools';
+import { tools, executeToolCall, completeWrite } from './tools';
+import { ToolExecutionContext } from './ToolExecutionContext';
+import { approvalManager } from './ApprovalManager';
 
 export class AgentController {
   private anthropic: Anthropic;
@@ -92,12 +94,48 @@ export class AgentController {
         for (const block of response.content) {
           if (block.type === 'tool_use') {
             try {
-              const result = await executeToolCall(block.name, block.input);
-              (toolResults.content as any[]).push({
-                type: 'tool_result',
-                tool_use_id: block.id,
-                content: result,
-              });
+              // Create execution context for approval workflow (M8)
+              const context = new ToolExecutionContext();
+              const result = await executeToolCall(block.name, block.input, context);
+
+              // Check if approval is needed
+              if (context.needsApproval() && context.approvalRequest) {
+                // Use actual tool use ID from API
+                context.approvalRequest.toolUseId = block.id;
+
+                // Yield approval_required to renderer
+                yield {
+                  type: 'approval_required',
+                  approvalRequest: context.approvalRequest,
+                };
+
+                // Wait for user approval response
+                const approvalResponse = await approvalManager.requestApproval(
+                  context.approvalRequest
+                );
+
+                // Complete write based on approval
+                const finalResult = await completeWrite(
+                  context.approvalRequest.filePath,
+                  context.approvalRequest.afterContent,
+                  approvalResponse.approved,
+                  approvalResponse.feedback
+                );
+
+                // Add final result to tool results
+                (toolResults.content as any[]).push({
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  content: finalResult,
+                });
+              } else {
+                // No approval needed, use result directly
+                (toolResults.content as any[]).push({
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  content: result,
+                });
+              }
             } catch (error: any) {
               (toolResults.content as any[]).push({
                 type: 'tool_result',

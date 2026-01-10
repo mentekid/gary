@@ -1,10 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useChatStore } from '../store/chatStore';
+import type { ApprovalRequest } from '../../common/types/ipc';
 
 /**
  * Sets up the agent response listener. Should only be called ONCE in App.tsx
  */
-export function useAgentResponseListener() {
+export function useAgentResponseListener(
+  onApprovalRequest?: (request: ApprovalRequest) => void
+) {
   const addMessage = useChatStore((state) => state.addMessage);
   const updateMessage = useChatStore((state) => state.updateMessage);
   const setIsStreaming = useChatStore((state) => state.setIsStreaming);
@@ -50,9 +53,14 @@ export function useAgentResponseListener() {
         });
         currentMessageRef.current = '';
         currentMessageIdRef.current = null;
+      } else if (response.type === 'approval_required') {
+        // M8: Handle approval request
+        if (onApprovalRequest && response.approvalRequest) {
+          onApprovalRequest(response.approvalRequest);
+        }
       }
     });
 
     return cleanup;
-  }, [addMessage, updateMessage, setIsStreaming]);
+  }, [addMessage, updateMessage, setIsStreaming, onApprovalRequest]);
 }

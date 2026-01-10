@@ -111,6 +111,46 @@ export class FileSystemManager {
       }
     }
   }
+
+  /**
+   * Write content to a file atomically (M7)
+   * Creates parent directories if needed
+   * Uses temp file + rename for atomicity
+   */
+  async writeFile(relativePath: string, content: string): Promise<number> {
+    // Validate path is within vault (security check)
+    const absolutePath = this.resolvePath(relativePath);
+    const resolvedAbsolutePath = path.resolve(absolutePath);
+    const resolvedVaultPath = path.resolve(this.vaultPath);
+
+    if (!resolvedAbsolutePath.startsWith(resolvedVaultPath)) {
+      throw new Error(`Invalid path: ${relativePath} is outside vault`);
+    }
+
+    try {
+      // Create parent directories if needed
+      const dir = path.dirname(absolutePath);
+      await fs.mkdir(dir, { recursive: true });
+
+      // Write to temp file first (atomic operation)
+      const tempPath = `${absolutePath}.tmp`;
+      await fs.writeFile(tempPath, content, 'utf-8');
+
+      // Atomic rename
+      await fs.rename(tempPath, absolutePath);
+
+      // Return bytes written
+      return Buffer.byteLength(content, 'utf-8');
+    } catch (err: any) {
+      if (err.code === 'EACCES') {
+        throw new Error(`Permission denied: Cannot write to ${relativePath}`);
+      } else if (err.code === 'ENOSPC') {
+        throw new Error(`No space left on device for ${relativePath}`);
+      } else {
+        throw new Error(`Failed to write file: ${err.message}`);
+      }
+    }
+  }
 }
 
 // Singleton instance

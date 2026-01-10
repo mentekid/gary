@@ -5,4 +5,5 @@ export const IPC_EVENTS = {
   SELECT_VAULT: 'select-vault',
   LIST_DIRECTORY: 'list-directory',
   FILE_STATE_UPDATED: 'file-state-updated',
+  APPROVAL_RESPONSE: 'approval-response', // M8: User responds to approval request
 } as const;

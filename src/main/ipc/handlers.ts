@@ -5,11 +5,13 @@ import {
   SelectVaultResponse,
   ListDirectoryRequest,
   ListDirectoryResponse,
+  ApprovalResponse,
 } from '../../common/types/ipc';
 import { fileSystemManager } from '../vault/FileSystemManager';
 import { vaultValidator } from '../vault/VaultValidator';
 import { agentController } from '../agent/AgentController';
 import { fileStateTracker } from '../vault/FileStateTracker';
+import { approvalManager } from '../agent/ApprovalManager';
 
 export function registerIpcHandlers() {
   // Agent streaming handler - M5
@@ -99,10 +101,19 @@ export function registerIpcHandlers() {
       }
     }
   );
+
+  // Approval response handler (M8) - user responds to write approval request
+  ipcMain.on(
+    IPC_EVENTS.APPROVAL_RESPONSE,
+    (_event, response: ApprovalResponse) => {
+      approvalManager.handleApprovalResponse(response);
+    }
+  );
 }
 
 export function unregisterIpcHandlers() {
   ipcMain.removeAllListeners(IPC_EVENTS.SEND_MESSAGE);
   ipcMain.removeHandler(IPC_EVENTS.SELECT_VAULT);
   ipcMain.removeHandler(IPC_EVENTS.LIST_DIRECTORY);
+  ipcMain.removeAllListeners(IPC_EVENTS.APPROVAL_RESPONSE);
 }

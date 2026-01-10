@@ -46,6 +46,10 @@ const ipcApi: IpcApi = {
       ipcRenderer.removeListener('file-state-updated', listener);
     };
   },
+
+  respondToApproval: (response: import('../common/types/ipc').ApprovalResponse): void => {
+    ipcRenderer.send('approval-response', response);
+  },
 };
 
 contextBridge.exposeInMainWorld('ipc', ipcApi);

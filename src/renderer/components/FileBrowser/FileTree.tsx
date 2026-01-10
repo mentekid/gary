@@ -4,6 +4,8 @@ import { useVaultStore } from '../../store/vaultStore';
 import { TreeNode, FileState } from '../../../common/types/vault';
 import { FileStateIcon } from './FileStateIcon';
 
+const HEADER_HEIGHT = 120; // App header height in pixels
+
 // Simple SVG icons as components
 function FolderIcon({ isOpen }: { isOpen: boolean }) {
   return (
@@ -171,7 +173,7 @@ export function FileTree() {
         data={fileTree}
         openByDefault={false}
         width="100%"
-        height={window.innerHeight - 120} // Subtract header height
+        height={window.innerHeight - HEADER_HEIGHT}
         indent={24}
         rowHeight={32}
       >

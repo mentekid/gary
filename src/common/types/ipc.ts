@@ -12,10 +12,6 @@ export interface UserMessagePayload {
   history?: Message[]; // Optional conversation context
 }
 
-export interface AssistantMessagePayload {
-  text: string;
-}
-
 // Agent streaming response types
 export interface AgentQueryResponse {
   type: 'chunk' | 'done' | 'error';

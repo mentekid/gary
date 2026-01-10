@@ -46,13 +46,28 @@ npm start
 
 ### Available Scripts
 
+**Development:**
 - `npm run dev` - Start all dev watchers (main, preload, renderer)
 - `npm run start:dev` - Run Electron in development mode
+
+**Building:**
 - `npm run build` - Build all processes for production
 - `npm start` - Run production build
 - `npm run build:main` - Build only main process
 - `npm run build:preload` - Build only preload script
 - `npm run build:renderer` - Build only renderer process
+
+**Testing:**
+- `npm test` - Run tests in watch mode
+- `npm run test:run` - Run tests once
+- `npm run test:coverage` - Generate coverage report
+- `npm run lint` - Type check all TypeScript
+
+**Verification:**
+- `npm run verify` - Run lint + tests + build (recommended before committing)
+- `npm run ci` - Same as verify (for CI pipelines)
+
+See [tests/README.md](tests/README.md) for detailed testing documentation.
 
 ## Project Structure
 
@@ -75,18 +90,21 @@ gary/
 
 ## Milestones
 
-### Milestone 1: Electron Hello World ✓
-Basic Electron application with TypeScript.
-
-### Milestone 2: React UI ✓
-React + Vite renderer process with Tailwind CSS.
-
-### Milestone 3: IPC Communication (In Progress)
-Echo server with IPC bridge for renderer ↔ main process communication.
+### Completed
+- **M1**: Electron Hello World ✓
+- **M2**: React UI ✓
+- **M3**: IPC Communication ✓
+- **M4**: File System Integration ✓
+- **M5**: Agent SDK Basic Integration ✓
+- **M6**: Agent File Tools (list, peek, read) ✓
 
 ### What's Next
-- **M4**: File system integration for Obsidian vaults
-- **M5+**: Agent SDK integration and custom tools
+- **M7**: Write Tool (file creation/modification)
+- **M8**: Approval Workflow + Diff Viewer
+- **M9**: prepend_frontmatter Tool
+- **M10+**: Planning Mode, Polish & Settings
+
+See [spec/implementation-plan.md](spec/implementation-plan.md) for full roadmap.
 
 ## Technical Notes
 

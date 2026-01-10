@@ -2,7 +2,6 @@ import { ipcMain, dialog } from 'electron';
 import { IPC_EVENTS } from './events';
 import {
   UserMessagePayload,
-  AssistantMessagePayload,
   SelectVaultResponse,
   ListDirectoryRequest,
   ListDirectoryResponse,

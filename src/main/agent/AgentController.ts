@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { AgentQueryRequest, AgentQueryResponse } from './types';
+import type { AgentQueryRequest } from './types';
+import type { AgentQueryResponse } from '../../common/types/ipc';
 import { SYSTEM_PROMPT_M6 } from './prompts/systemPrompt';
 import { tools, executeToolCall } from './tools';
 

@@ -300,3 +300,205 @@ describe('Prepend Frontmatter Tool (M9)', () => {
     });
   });
 });
+
+describe('Search Tools', () => {
+  let testVaultPath: string;
+
+  beforeEach(async () => {
+    testVaultPath = path.join(os.tmpdir(), `gary-test-${Date.now()}`);
+    await fs.mkdir(testVaultPath, { recursive: true });
+    fileSystemManager.setVaultPath(testVaultPath);
+  });
+
+  afterEach(async () => {
+    try {
+      await fs.rm(testVaultPath, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  describe('find_files tool', () => {
+    it('finds files by partial name (case-insensitive)', async () => {
+      // Create test files
+      await fs.mkdir(path.join(testVaultPath, 'NPCs'), { recursive: true });
+      await fs.writeFile(
+        path.join(testVaultPath, 'NPCs', 'The Gilded Serpent.md'),
+        'NPC content'
+      );
+      await fs.writeFile(
+        path.join(testVaultPath, 'NPCs', 'Dragon Lair.md'),
+        'Location content'
+      );
+
+      const result = await executeToolCall('find_files', {
+        search_term: 'gilded serpent',
+      });
+
+      expect(result).toContain('The Gilded Serpent.md');
+      expect(result).toContain('NPCs/The Gilded Serpent.md');
+      expect(result).not.toContain('Dragon Lair.md');
+    });
+
+    it('is case-insensitive', async () => {
+      await fs.writeFile(path.join(testVaultPath, 'UPPERCASE.md'), 'content');
+
+      const result = await executeToolCall('find_files', {
+        search_term: 'uppercase',
+      });
+
+      expect(result).toContain('UPPERCASE.md');
+    });
+
+    it('searches recursively', async () => {
+      await fs.mkdir(path.join(testVaultPath, 'deep', 'nested'), { recursive: true });
+      await fs.writeFile(
+        path.join(testVaultPath, 'deep', 'nested', 'hidden.md'),
+        'content'
+      );
+
+      const result = await executeToolCall('find_files', {
+        search_term: 'hidden',
+      });
+
+      expect(result).toContain('deep/nested/hidden.md');
+    });
+
+    it('returns message when no files found', async () => {
+      const result = await executeToolCall('find_files', {
+        search_term: 'nonexistent',
+      });
+
+      expect(result).toContain('No files found');
+      expect(result).toContain('nonexistent');
+    });
+
+    it('finds multiple matching files', async () => {
+      await fs.writeFile(path.join(testVaultPath, 'Session 1.md'), 'content');
+      await fs.writeFile(path.join(testVaultPath, 'Session 2.md'), 'content');
+      await fs.writeFile(path.join(testVaultPath, 'Session 3.md'), 'content');
+
+      const result = await executeToolCall('find_files', {
+        search_term: 'session',
+      });
+
+      expect(result).toContain('Session 1.md');
+      expect(result).toContain('Session 2.md');
+      expect(result).toContain('Session 3.md');
+      expect(result).toContain('Found 3 file(s)');
+    });
+  });
+
+  describe('search_content tool', () => {
+    it('finds files containing keyword', async () => {
+      await fs.writeFile(
+        path.join(testVaultPath, 'test.md'),
+        'This file contains the word dragon in it.'
+      );
+
+      const result = await executeToolCall('search_content', {
+        keyword: 'dragon',
+      });
+
+      expect(result).toContain('test.md');
+      expect(result).toContain('Line 1');
+      expect(result).toContain('dragon');
+    });
+
+    it('is case-insensitive', async () => {
+      await fs.writeFile(
+        path.join(testVaultPath, 'test.md'),
+        'Content with UPPERCASE keyword'
+      );
+
+      const result = await executeToolCall('search_content', {
+        keyword: 'uppercase',
+      });
+
+      expect(result).toContain('test.md');
+      expect(result).toContain('UPPERCASE');
+    });
+
+    it('searches recursively', async () => {
+      await fs.mkdir(path.join(testVaultPath, 'nested'), { recursive: true });
+      await fs.writeFile(
+        path.join(testVaultPath, 'nested', 'deep.md'),
+        'Content with special keyword'
+      );
+
+      const result = await executeToolCall('search_content', {
+        keyword: 'special',
+      });
+
+      expect(result).toContain('nested/deep.md');
+      expect(result).toContain('special keyword');
+    });
+
+    it('shows line numbers for matches', async () => {
+      await fs.writeFile(
+        path.join(testVaultPath, 'test.md'),
+        'Line 1\nLine 2 has keyword\nLine 3'
+      );
+
+      const result = await executeToolCall('search_content', {
+        keyword: 'keyword',
+      });
+
+      expect(result).toContain('Line 2:');
+      expect(result).toContain('has keyword');
+    });
+
+    it('limits preview to 3 matches per file', async () => {
+      const content = Array(10)
+        .fill('match')
+        .join('\n');
+      await fs.writeFile(path.join(testVaultPath, 'test.md'), content);
+
+      const result = await executeToolCall('search_content', {
+        keyword: 'match',
+      });
+
+      expect(result).toContain('... 7 more matches');
+    });
+
+    it('returns message when no matches found', async () => {
+      await fs.writeFile(path.join(testVaultPath, 'test.md'), 'no matches here');
+
+      const result = await executeToolCall('search_content', {
+        keyword: 'dragon',
+      });
+
+      expect(result).toContain('No files found containing');
+      expect(result).toContain('dragon');
+    });
+
+    it('handles multiple files with matches', async () => {
+      await fs.writeFile(path.join(testVaultPath, 'file1.md'), 'has target');
+      await fs.writeFile(path.join(testVaultPath, 'file2.md'), 'also has target');
+
+      const result = await executeToolCall('search_content', {
+        keyword: 'target',
+      });
+
+      expect(result).toContain('file1.md');
+      expect(result).toContain('file2.md');
+      expect(result).toContain('Found "target" in 2 file(s)');
+    });
+  });
+
+  describe('tool definitions', () => {
+    it('includes find_files in tools array', () => {
+      const tool = tools.find(t => t.name === 'find_files');
+      expect(tool).toBeDefined();
+      expect(tool?.description).toContain('Search for files by name');
+      expect(tool?.input_schema.required).toEqual(['search_term']);
+    });
+
+    it('includes search_content in tools array', () => {
+      const tool = tools.find(t => t.name === 'search_content');
+      expect(tool).toBeDefined();
+      expect(tool?.description).toContain('Search file contents');
+      expect(tool?.input_schema.required).toEqual(['keyword']);
+    });
+  });
+});

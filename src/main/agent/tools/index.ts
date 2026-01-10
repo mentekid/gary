@@ -87,6 +87,34 @@ export const tools: Anthropic.Tool[] = [
       required: ['path'],
     },
   },
+  {
+    name: 'find_files',
+    description: 'Search for files by name (case-insensitive, recursive). Use when you know part of a filename but not the full path. Example: "gilded serpent" finds "The Gilded Serpent.md".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        search_term: {
+          type: 'string',
+          description: 'Text to search for in file names (case-insensitive)',
+        },
+      },
+      required: ['search_term'],
+    },
+  },
+  {
+    name: 'search_content',
+    description: 'Search file contents for keyword (case-insensitive, recursive). Returns matching files with context lines. Use to find files containing specific text.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        keyword: {
+          type: 'string',
+          description: 'Keyword to search for in file contents (case-insensitive)',
+        },
+      },
+      required: ['keyword'],
+    },
+  },
 ];
 
 // Execute a tool call
@@ -106,6 +134,10 @@ export async function executeToolCall(
       return await writeTool(toolInput.path, toolInput.content, context);
     case 'prepend_frontmatter':
       return await prependFrontmatterTool(toolInput.path);
+    case 'find_files':
+      return await findFilesTool(toolInput.search_term);
+    case 'search_content':
+      return await searchContentTool(toolInput.keyword);
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }
@@ -261,5 +293,95 @@ async function prependFrontmatterTool(path: string): Promise<string> {
     return `Successfully prepended frontmatter to ${path} (${bytesWritten} bytes total)`;
   } catch (error: any) {
     return `Error prepending frontmatter: ${error.message}`;
+  }
+}
+
+/**
+ * Find files by name (case-insensitive, recursive)
+ * Example: "gilded serpent" finds "The Gilded Serpent.md"
+ */
+async function findFilesTool(searchTerm: string): Promise<string> {
+  try {
+    // Get all files recursively
+    const entries = await fileSystemManager.listDirectory('', true);
+
+    // Filter to files only and search case-insensitively
+    const searchLower = searchTerm.toLowerCase();
+    const matches = entries.filter(
+      (entry) =>
+        entry.type === 'file' && entry.name.toLowerCase().includes(searchLower)
+    );
+
+    if (matches.length === 0) {
+      return `No files found matching "${searchTerm}"`;
+    }
+
+    // Format results
+    const results = matches
+      .map((file) => `${file.path}`)
+      .sort()
+      .join('\n');
+
+    return `Found ${matches.length} file(s) matching "${searchTerm}":\n${results}`;
+  } catch (error: any) {
+    return `Error searching files: ${error.message}`;
+  }
+}
+
+/**
+ * Search file contents for keyword (case-insensitive, recursive)
+ * Returns matching files with context lines
+ */
+async function searchContentTool(keyword: string): Promise<string> {
+  try {
+    // Get all files recursively
+    const entries = await fileSystemManager.listDirectory('', true);
+    const files = entries.filter((entry) => entry.type === 'file');
+
+    const keywordLower = keyword.toLowerCase();
+    const matches: Array<{ path: string; lines: string[] }> = [];
+
+    // Search each file
+    for (const file of files) {
+      try {
+        const content = await fileSystemManager.readFile(file.path);
+        const lines = content.split('\n');
+        const matchingLines: string[] = [];
+
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].toLowerCase().includes(keywordLower)) {
+            // Include line number and context
+            const lineNum = i + 1;
+            matchingLines.push(`  Line ${lineNum}: ${lines[i].trim()}`);
+          }
+        }
+
+        if (matchingLines.length > 0) {
+          matches.push({ path: file.path, lines: matchingLines });
+        }
+      } catch {
+        // Skip files that can't be read (binary, permissions, etc.)
+        continue;
+      }
+    }
+
+    if (matches.length === 0) {
+      return `No files found containing "${keyword}"`;
+    }
+
+    // Format results
+    const results = matches
+      .map((match) => {
+        const preview =
+          match.lines.length > 3
+            ? match.lines.slice(0, 3).join('\n') + `\n  ... ${match.lines.length - 3} more matches`
+            : match.lines.join('\n');
+        return `${match.path}:\n${preview}`;
+      })
+      .join('\n\n');
+
+    return `Found "${keyword}" in ${matches.length} file(s):\n\n${results}`;
+  } catch (error: any) {
+    return `Error searching content: ${error.message}`;
   }
 }

@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Anthropic from '@anthropic-ai/sdk';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
 
 vi.mock('@anthropic-ai/sdk');
 vi.mock('@main/agent/tools');
@@ -7,6 +10,8 @@ vi.mock('@main/agent/prompts/systemPrompt');
 
 import { AgentController } from '@main/agent/AgentController';
 import { executeToolCall } from '@main/agent/tools';
+import { fileSystemManager } from '@main/vault/FileSystemManager';
+import { fileStateTracker } from '@main/vault/FileStateTracker';
 
 describe('AgentController', () => {
   let controller: AgentController;
@@ -127,5 +132,96 @@ describe('AgentController', () => {
     // Should have gone through multiple turns
     expect(mockCreate).toHaveBeenCalledTimes(3);
     expect(responses[responses.length - 1].type).toBe('done');
+  });
+
+  it('CRITICAL: auto-loads CAMPAIGN.md at session start', async () => {
+    // Create a test vault with CAMPAIGN.md
+    const testVaultPath = path.join(os.tmpdir(), `gary-test-campaign-${Date.now()}`);
+    await fs.mkdir(testVaultPath, { recursive: true });
+
+    try {
+      const campaignContent = '# Test Campaign\n\nThis is a test campaign.';
+      await fs.writeFile(
+        path.join(testVaultPath, 'CAMPAIGN.md'),
+        campaignContent
+      );
+
+      // Verify file was created
+      const fileExists = await fs.access(path.join(testVaultPath, 'CAMPAIGN.md'))
+        .then(() => true)
+        .catch(() => false);
+      expect(fileExists).toBe(true);
+
+      fileSystemManager.setVaultPath(testVaultPath);
+      fileStateTracker.clear();
+
+      // Mock API response
+      mockCreate.mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Response' }],
+      });
+
+      // Query with empty conversation history (first message)
+      const responses = [];
+      for await (const r of controller.query({
+        message: 'Hello',
+        conversationHistory: [],
+      })) {
+        responses.push(r);
+      }
+
+      // CRITICAL: Verify CAMPAIGN.md was marked as READ and visible in file browser
+      expect(fileStateTracker.getState('CAMPAIGN.md')).toBe('read');
+    } finally {
+      await fs.rm(testVaultPath, { recursive: true, force: true });
+    }
+  });
+
+  it('CRITICAL: auto-loads vault structure at session start', async () => {
+    // Create a test vault with directory structure
+    const testVaultPath = path.join(os.tmpdir(), `gary-test-structure-${Date.now()}`);
+    await fs.mkdir(testVaultPath, { recursive: true });
+
+    try {
+      // Create directory structure: NPCs/, sessions/Notes/
+      await fs.mkdir(path.join(testVaultPath, 'NPCs'), { recursive: true });
+      await fs.mkdir(path.join(testVaultPath, 'sessions', 'Notes'), { recursive: true });
+
+      // Add some files
+      await fs.writeFile(path.join(testVaultPath, 'NPCs', 'Thorin.md'), 'NPC content');
+      await fs.writeFile(path.join(testVaultPath, 'NPCs', 'Elara.md'), 'NPC content');
+      await fs.writeFile(path.join(testVaultPath, 'sessions', 'Notes', 'Session1.md'), 'Notes');
+
+      fileSystemManager.setVaultPath(testVaultPath);
+      fileStateTracker.clear();
+
+      // Mock API response and capture the messages sent to API
+      let capturedMessages: any[] = [];
+      mockCreate.mockImplementation((params: any) => {
+        capturedMessages = params.messages;
+        return Promise.resolve({
+          content: [{ type: 'text', text: 'Response' }],
+        });
+      });
+
+      // Query with empty conversation history (first message)
+      const responses = [];
+      for await (const r of controller.query({
+        message: 'Hello',
+        conversationHistory: [],
+      })) {
+        responses.push(r);
+      }
+
+      // Verify vault structure was loaded
+      const structureMessage = capturedMessages.find((m: any) =>
+        m.content?.includes('Vault directory structure')
+      );
+      expect(structureMessage).toBeDefined();
+      expect(structureMessage.content).toContain('📁 NPCs/');
+      expect(structureMessage.content).toContain('2 files'); // Thorin.md and Elara.md
+      expect(structureMessage.content).toContain('📁 sessions/');
+    } finally {
+      await fs.rm(testVaultPath, { recursive: true, force: true });
+    }
   });
 });

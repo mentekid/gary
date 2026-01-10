@@ -1,6 +1,9 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { BrowserWindow } from 'electron';
 import { FileEntry } from '../../common/types/vault';
+import { IPC_EVENTS } from '../ipc/events';
+import type { FileCreatedEvent, DirectoryCreatedEvent } from '../../common/types/ipc';
 
 export class FileSystemManager {
   private vaultPath: string = '';
@@ -116,6 +119,7 @@ export class FileSystemManager {
    * Write content to a file atomically (M7)
    * Creates parent directories if needed
    * Uses temp file + rename for atomicity
+   * Emits FILE_CREATED and DIRECTORY_CREATED events for UI updates
    */
   async writeFile(relativePath: string, content: string): Promise<number> {
     // Validate path is within vault (security check)
@@ -128,6 +132,28 @@ export class FileSystemManager {
     }
 
     try {
+      // Check if file existed before write
+      const fileExistedBefore = await this.fileExists(relativePath);
+
+      // Track which directories need to be created
+      const newDirectories: string[] = [];
+      const dirPath = path.dirname(relativePath);
+
+      if (dirPath && dirPath !== '.') {
+        // Check which parent directories need to be created
+        const pathParts = dirPath.split('/');
+        let currentPath = '';
+
+        for (const part of pathParts) {
+          currentPath = currentPath ? `${currentPath}/${part}` : part;
+          const dirExists = await this.fileExists(currentPath);
+
+          if (!dirExists) {
+            newDirectories.push(currentPath);
+          }
+        }
+      }
+
       // Create parent directories if needed
       const dir = path.dirname(absolutePath);
       await fs.mkdir(dir, { recursive: true });
@@ -139,6 +165,18 @@ export class FileSystemManager {
       // Atomic rename
       await fs.rename(tempPath, absolutePath);
 
+      // Emit events for UI updates
+      if (!fileExistedBefore) {
+        // Emit directory created events
+        for (const newDir of newDirectories) {
+          this.emitDirectoryCreated(newDir);
+        }
+
+        // Emit file created event
+        const fileEntry = await this.createFileEntry(relativePath);
+        this.emitFileCreated(relativePath, fileEntry);
+      }
+
       // Return bytes written
       return Buffer.byteLength(content, 'utf-8');
     } catch (err: any) {
@@ -149,6 +187,48 @@ export class FileSystemManager {
       } else {
         throw new Error(`Failed to write file: ${err.message}`);
       }
+    }
+  }
+
+  /**
+   * Create a FileEntry for a given relative path
+   */
+  private async createFileEntry(relativePath: string): Promise<FileEntry> {
+    const absolutePath = this.resolvePath(relativePath);
+    const stats = await fs.stat(absolutePath);
+    const fileName = path.basename(relativePath);
+
+    return {
+      name: fileName,
+      path: relativePath,
+      type: stats.isDirectory() ? 'directory' : 'file',
+      extension: path.extname(fileName).slice(1),
+      size: stats.size,
+      modified: stats.mtimeMs,
+    };
+  }
+
+  /**
+   * Emit file created event to renderer
+   */
+  private emitFileCreated(filePath: string, fileEntry: FileEntry): void {
+    const windows = BrowserWindow.getAllWindows();
+    const event: FileCreatedEvent = { filePath, fileEntry };
+
+    for (const window of windows) {
+      window.webContents.send(IPC_EVENTS.FILE_CREATED, event);
+    }
+  }
+
+  /**
+   * Emit directory created event to renderer
+   */
+  private emitDirectoryCreated(dirPath: string): void {
+    const windows = BrowserWindow.getAllWindows();
+    const event: DirectoryCreatedEvent = { dirPath };
+
+    for (const window of windows) {
+      window.webContents.send(IPC_EVENTS.DIRECTORY_CREATED, event);
     }
   }
 }

@@ -24,6 +24,8 @@ interface VaultState {
   selectVault: () => Promise<void>;
   loadFileTree: () => Promise<void>;
   updateFileState: (path: string, state: FileState) => void;
+  insertFile: (filePath: string, fileEntry: FileEntry) => void;
+  insertDirectory: (dirPath: string) => void;
   clearError: () => void;
 }
 
@@ -167,7 +169,121 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     });
   },
 
+  insertFile: (filePath, fileEntry) => {
+    set((prevState) => {
+      // Clone the current tree
+      const newTree = [...prevState.fileTree];
+
+      // Convert FileEntry to TreeNode
+      const newNode: TreeNode = {
+        ...fileEntry,
+        id: fileEntry.path,
+        children: undefined,
+      };
+
+      // Find parent path
+      const pathParts = filePath.split('/');
+
+      if (pathParts.length === 1) {
+        // Root level file
+        newTree.push(newNode);
+        return { fileTree: sortTree(newTree) };
+      }
+
+      // Find parent node and insert
+      const parentPath = pathParts.slice(0, -1).join('/');
+      const parent = findNode(newTree, parentPath);
+
+      if (parent && parent.children) {
+        parent.children.push(newNode);
+        parent.children = sortNodes(parent.children);
+      }
+
+      return { fileTree: [...newTree] };
+    });
+  },
+
+  insertDirectory: (dirPath) => {
+    set((prevState) => {
+      const newTree = [...prevState.fileTree];
+
+      // Split path into parts
+      const pathParts = dirPath.split('/');
+      let currentLevel = newTree;
+      let currentPath = '';
+
+      for (let i = 0; i < pathParts.length; i++) {
+        const dirName = pathParts[i];
+        currentPath = currentPath ? `${currentPath}/${dirName}` : dirName;
+
+        // Check if directory already exists at this level
+        let dirNode = currentLevel.find((node) => node.name === dirName);
+
+        if (!dirNode) {
+          // Create new directory node
+          dirNode = {
+            id: currentPath,
+            name: dirName,
+            path: currentPath,
+            type: 'directory',
+            extension: '',
+            parent: i > 0 ? pathParts.slice(0, i).join('/') : undefined,
+            children: [],
+          };
+
+          currentLevel.push(dirNode);
+          currentLevel.sort((a, b) => {
+            if (a.type === 'directory' && b.type === 'file') return -1;
+            if (a.type === 'file' && b.type === 'directory') return 1;
+            return a.name.localeCompare(b.name);
+          });
+        }
+
+        // Move to next level
+        currentLevel = dirNode.children || [];
+      }
+
+      return { fileTree: [...newTree] };
+    });
+  },
+
   clearError: () => {
     set({ error: null, warning: null });
   },
 }));
+
+// Helper function to find a node in the tree by path
+function findNode(tree: TreeNode[], targetPath: string): TreeNode | null {
+  for (const node of tree) {
+    if (node.path === targetPath) {
+      return node;
+    }
+
+    if (node.children) {
+      const found = findNode(node.children, targetPath);
+      if (found) return found;
+    }
+  }
+
+  return null;
+}
+
+// Helper function to sort nodes (directories first, then alphabetically)
+function sortNodes(nodes: TreeNode[]): TreeNode[] {
+  return nodes.sort((a, b) => {
+    if (a.type === 'directory' && b.type === 'file') return -1;
+    if (a.type === 'file' && b.type === 'directory') return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+// Helper function to sort entire tree recursively
+function sortTree(nodes: TreeNode[]): TreeNode[] {
+  const sorted = sortNodes(nodes);
+  for (const node of sorted) {
+    if (node.children) {
+      node.children = sortTree(node.children);
+    }
+  }
+  return sorted;
+}

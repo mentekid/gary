@@ -4,6 +4,8 @@ import type {
   UserMessagePayload,
   AgentQueryResponse,
   FileStateUpdate,
+  FileCreatedEvent,
+  DirectoryCreatedEvent,
   SelectVaultResponse,
   ListDirectoryRequest,
   ListDirectoryResponse,
@@ -44,6 +46,30 @@ const ipcApi: IpcApi = {
     // Return cleanup function
     return () => {
       ipcRenderer.removeListener('file-state-updated', listener);
+    };
+  },
+
+  onFileCreated: (callback: (event: FileCreatedEvent) => void) => {
+    const listener = (_event: any, data: FileCreatedEvent) => {
+      callback(data);
+    };
+    ipcRenderer.on('file-created', listener);
+
+    // Return cleanup function
+    return () => {
+      ipcRenderer.removeListener('file-created', listener);
+    };
+  },
+
+  onDirectoryCreated: (callback: (event: DirectoryCreatedEvent) => void) => {
+    const listener = (_event: any, data: DirectoryCreatedEvent) => {
+      callback(data);
+    };
+    ipcRenderer.on('directory-created', listener);
+
+    // Return cleanup function
+    return () => {
+      ipcRenderer.removeListener('directory-created', listener);
     };
   },
 

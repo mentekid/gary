@@ -27,6 +27,16 @@ export interface FileStateUpdate {
   state: import('./vault').FileState;
 }
 
+// File tree update events
+export interface FileCreatedEvent {
+  filePath: string; // Relative path
+  fileEntry: import('./vault').FileEntry;
+}
+
+export interface DirectoryCreatedEvent {
+  dirPath: string; // Relative path
+}
+
 // Vault-related IPC types
 export interface SelectVaultResponse {
   success: boolean;
@@ -66,5 +76,7 @@ export interface IpcApi {
   selectVault: () => Promise<SelectVaultResponse>;
   listDirectory: (request: ListDirectoryRequest) => Promise<ListDirectoryResponse>;
   onFileStateUpdate: (callback: (update: FileStateUpdate) => void) => () => void;
+  onFileCreated: (callback: (event: FileCreatedEvent) => void) => () => void;
+  onDirectoryCreated: (callback: (event: DirectoryCreatedEvent) => void) => () => void;
   respondToApproval: (response: ApprovalResponse) => void;
 }

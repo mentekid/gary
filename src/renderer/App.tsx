@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { MainLayout } from './components/Layout/MainLayout';
 import { useVaultStore } from './store/vaultStore';
 import { useFileStateSync } from './hooks/useFileStateSync';
+import { useFileTreeSync } from './hooks/useFileTreeSync';
 import { useAgentResponseListener } from './hooks/useAgentResponseListener';
 import { useApprovalListener } from './hooks/useApprovalListener';
 import ApprovalModal from './components/Approval/ApprovalModal';
@@ -11,6 +12,9 @@ function App() {
 
   // Subscribe to file state updates from main process
   useFileStateSync();
+
+  // Subscribe to file tree updates (new files/directories)
+  useFileTreeSync();
 
   // M8: Approval workflow
   const { pendingApproval, requestApproval, handleApprove, handleReject } = useApprovalListener();

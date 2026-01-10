@@ -6,4 +6,7 @@ export const IPC_EVENTS = {
   LIST_DIRECTORY: 'list-directory',
   FILE_STATE_UPDATED: 'file-state-updated',
   APPROVAL_RESPONSE: 'approval-response', // M8: User responds to approval request
+  FILE_CREATED: 'file-created', // File/directory created by agent
+  DIRECTORY_CREATED: 'directory-created', // Directory created by agent
+  FILE_DELETED: 'file-deleted', // File deleted by agent (future)
 } as const;

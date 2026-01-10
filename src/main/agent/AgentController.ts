@@ -5,6 +5,8 @@ import { SYSTEM_PROMPT_M6 } from './prompts/systemPrompt';
 import { tools, executeToolCall, completeWrite } from './tools';
 import { ToolExecutionContext } from './ToolExecutionContext';
 import { approvalManager } from './ApprovalManager';
+import { fileSystemManager } from '../vault/FileSystemManager';
+import { fileStateTracker } from '../vault/FileStateTracker';
 
 export class AgentController {
   private anthropic: Anthropic;
@@ -26,6 +28,162 @@ export class AgentController {
     return apiKey;
   }
 
+  /**
+   * Auto-load CAMPAIGN.md at the start of a session
+   * Per spec: "Gary always reads this file in its entirety when a session starts"
+   */
+  private async loadCampaignFile(messages: Anthropic.MessageParam[]): Promise<void> {
+    // Try both common variations
+    const possibleNames = ['CAMPAIGN.md', 'Campaign.md'];
+
+    for (const filename of possibleNames) {
+      try {
+        const exists = await fileSystemManager.fileExists(filename);
+        if (exists) {
+          const content = await fileSystemManager.readFile(filename);
+
+          // Mark as READ in file state tracker
+          fileStateTracker.markRead(filename);
+
+          // Add to conversation context as a user message
+          messages.push({
+            role: 'user',
+            content: `Here is the campaign file (${filename}):\n\n${content}`,
+          });
+
+          return; // Found and loaded, exit
+        }
+      } catch (error) {
+        // File doesn't exist or can't be read, try next variation
+        continue;
+      }
+    }
+
+    // No CAMPAIGN.md found - not an error, just means vault doesn't have one yet
+  }
+
+  /**
+   * Auto-load vault structure at session start
+   * Provides directory layout context to reduce list_directory calls
+   */
+  private async loadVaultStructure(messages: Anthropic.MessageParam[]): Promise<void> {
+    try {
+      const entries = await fileSystemManager.listDirectory('', true); // recursive
+      const structure = this.formatVaultStructure(entries);
+
+      if (structure) {
+        messages.push({
+          role: 'user',
+          content: `Vault directory structure:\n${structure}`,
+        });
+      }
+    } catch (error) {
+      // Don't fail session start if structure loading fails
+      console.error('Failed to load vault structure:', error);
+    }
+  }
+
+  /**
+   * Format vault structure as a compact tree
+   * Shows directories only with file counts, max 3 levels deep
+   */
+  private formatVaultStructure(entries: any[]): string {
+    interface DirNode {
+      name: string;
+      path: string;
+      fileCount: number;
+      subdirs: Map<string, DirNode>;
+    }
+
+    // Build directory tree with file counts
+    const root: Map<string, DirNode> = new Map();
+
+    for (const entry of entries) {
+      const pathParts = entry.path.split('/');
+
+      if (entry.type === 'file') {
+        // Count file in its parent directory
+        if (pathParts.length === 1) {
+          // Root level file - skip (will mention separately)
+          continue;
+        }
+
+        // Navigate to parent directory and increment count
+        let currentLevel = root;
+        for (let i = 0; i < pathParts.length - 1; i++) {
+          const dirName = pathParts[i];
+          if (!currentLevel.has(dirName)) {
+            currentLevel.set(dirName, {
+              name: dirName,
+              path: pathParts.slice(0, i + 1).join('/'),
+              fileCount: 0,
+              subdirs: new Map(),
+            });
+          }
+          const node = currentLevel.get(dirName)!;
+          if (i === pathParts.length - 2) {
+            // This is the direct parent
+            node.fileCount++;
+          }
+          currentLevel = node.subdirs;
+        }
+      } else if (entry.type === 'directory') {
+        // Ensure directory exists in tree
+        let currentLevel = root;
+        for (let i = 0; i < pathParts.length; i++) {
+          const dirName = pathParts[i];
+          if (!currentLevel.has(dirName)) {
+            currentLevel.set(dirName, {
+              name: dirName,
+              path: pathParts.slice(0, i + 1).join('/'),
+              fileCount: 0,
+              subdirs: new Map(),
+            });
+          }
+          currentLevel = currentLevel.get(dirName)!.subdirs;
+        }
+      }
+    }
+
+    // Format as tree with max depth of 3
+    const lines: string[] = [];
+    const formatNode = (node: DirNode, depth: number, prefix: string) => {
+      if (depth > 3) return; // Max depth limit
+
+      const indent = '  '.repeat(depth);
+      const fileInfo = node.fileCount > 0 ? ` (${node.fileCount} files)` : '';
+      lines.push(`${indent}📁 ${node.name}/${fileInfo}`);
+
+      // Sort subdirectories alphabetically
+      const sortedSubdirs = Array.from(node.subdirs.values()).sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+
+      for (const subdir of sortedSubdirs) {
+        formatNode(subdir, depth + 1, prefix + '  ');
+      }
+    };
+
+    // Sort root directories alphabetically
+    const sortedRoot = Array.from(root.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+
+    for (const node of sortedRoot) {
+      formatNode(node, 0, '');
+    }
+
+    // Count root-level files
+    const rootFiles = entries.filter(
+      (e) => e.type === 'file' && !e.path.includes('/')
+    );
+    if (rootFiles.length > 0) {
+      lines.push(`\nRoot level: ${rootFiles.length} files`);
+    }
+
+    return lines.join('\n');
+  }
+
   async *query(request: AgentQueryRequest): AsyncGenerator<AgentQueryResponse> {
     try {
       // Build message history for API
@@ -34,6 +192,12 @@ export class AgentController {
           role: msg.role as 'user' | 'assistant',
           content: msg.content,
         }));
+
+      // Auto-load CAMPAIGN.md and vault structure if this is the first message
+      if (messages.length === 0) {
+        await this.loadCampaignFile(messages);
+        await this.loadVaultStructure(messages);
+      }
 
       // Add current message
       messages.push({

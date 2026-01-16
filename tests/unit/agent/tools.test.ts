@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BrowserWindow } from 'electron';
 import { executeToolCall, tools } from '@main/agent/tools';
+import { ToolExecutionContext } from '@main/agent/ToolExecutionContext';
 import { fileSystemManager } from '@main/vault/FileSystemManager';
 import { fileStateTracker } from '@main/vault/FileStateTracker';
 import { FileState } from '@common/types/vault';
@@ -500,5 +501,85 @@ describe('Search Tools', () => {
       expect(tool?.description).toContain('Search file contents');
       expect(tool?.input_schema.required).toEqual(['keyword']);
     });
+  });
+});
+
+describe('ask_planning_questions Tool (M10)', () => {
+  it('should be defined in tools array', () => {
+    const tool = tools.find((t) => t.name === 'ask_planning_questions');
+    expect(tool).toBeDefined();
+    expect(tool?.description).toContain('multiple required questions');
+    expect(tool?.input_schema.properties.questions.type).toBe('array');
+    expect(tool?.input_schema.properties.questions.items.type).toBe('string');
+    expect(tool?.input_schema.required).toContain('questions');
+  });
+
+  it('should create planning request with sequential question IDs', async () => {
+    const context = new ToolExecutionContext();
+    const questions = ['What tone?', 'How many enemies?'];
+
+    const result = await executeToolCall('ask_planning_questions', { questions }, context);
+
+    expect(context.needsPlanning()).toBe(true);
+    expect(context.planningRequest?.questions).toHaveLength(2);
+    expect(context.planningRequest?.questions[0].id).toBe('q_0');
+    expect(context.planningRequest?.questions[0].question).toBe('What tone?');
+    expect(context.planningRequest?.questions[1].id).toBe('q_1');
+    expect(context.planningRequest?.questions[1].question).toBe('How many enemies?');
+    expect(result).toBe('__PLANNING_PENDING__');
+  });
+
+  it('should return PLANNING_PENDING sentinel', async () => {
+    const context = new ToolExecutionContext();
+    const result = await executeToolCall(
+      'ask_planning_questions',
+      { questions: ['Question?'] },
+      context
+    );
+    expect(result).toBe('__PLANNING_PENDING__');
+  });
+
+  it('should error when no context provided', async () => {
+    const result = await executeToolCall(
+      'ask_planning_questions',
+      { questions: ['Q?'] }
+    );
+    expect(result).toContain('Error: Planning requires execution context');
+  });
+
+  it('should error when questions array is empty', async () => {
+    const context = new ToolExecutionContext();
+    const result = await executeToolCall(
+      'ask_planning_questions',
+      { questions: [] },
+      context
+    );
+    expect(result).toContain('Error: Must provide at least one question');
+  });
+
+  it('should work with single question (minItems: 1)', async () => {
+    const context = new ToolExecutionContext();
+    const result = await executeToolCall(
+      'ask_planning_questions',
+      { questions: ['Single question?'] },
+      context
+    );
+
+    expect(context.needsPlanning()).toBe(true);
+    expect(context.planningRequest?.questions).toHaveLength(1);
+    expect(context.planningRequest?.questions[0].id).toBe('q_0');
+    expect(result).toBe('__PLANNING_PENDING__');
+  });
+
+  it('should generate unique toolUseId', async () => {
+    const context1 = new ToolExecutionContext();
+    const context2 = new ToolExecutionContext();
+
+    await executeToolCall('ask_planning_questions', { questions: ['Q1?'] }, context1);
+    await executeToolCall('ask_planning_questions', { questions: ['Q2?'] }, context2);
+
+    expect(context1.planningRequest?.toolUseId).toBeDefined();
+    expect(context2.planningRequest?.toolUseId).toBeDefined();
+    expect(context1.planningRequest?.toolUseId).not.toBe(context2.planningRequest?.toolUseId);
   });
 });

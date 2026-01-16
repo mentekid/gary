@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useChatStore } from '../store/chatStore';
-import type { ApprovalRequest } from '../../common/types/ipc';
+import type { ApprovalRequest, PlanningRequest } from '../../common/types/ipc';
 
 /**
  * Sets up the agent response listener. Should only be called ONCE in App.tsx
  */
 export function useAgentResponseListener(
-  onApprovalRequest?: (request: ApprovalRequest) => void
+  onApprovalRequest?: (request: ApprovalRequest) => void,
+  onPlanningRequest?: (request: PlanningRequest) => void
 ) {
   const addMessage = useChatStore((state) => state.addMessage);
   const updateMessage = useChatStore((state) => state.updateMessage);
@@ -68,9 +69,18 @@ export function useAgentResponseListener(
         if (onApprovalRequest && response.approvalRequest) {
           onApprovalRequest(response.approvalRequest);
         }
+      } else if (response.type === 'planning_required') {
+        // M10: Handle planning request
+        console.log('[AGENT_RESPONSE_LISTENER] Received planning_required:', {
+          hasRequest: !!response.planningRequest,
+          questionCount: response.planningRequest?.questions.length,
+        });
+        if (onPlanningRequest && response.planningRequest) {
+          onPlanningRequest(response.planningRequest);
+        }
       }
     });
 
     return cleanup;
-  }, [addMessage, updateMessage, setIsStreaming, onApprovalRequest]);
+  }, [addMessage, updateMessage, setIsStreaming, onApprovalRequest, onPlanningRequest]);
 }

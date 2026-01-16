@@ -1,7 +1,7 @@
 // Message structure for chat
 export interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'summary';
   content: string;
   timestamp: number;
 }
@@ -14,11 +14,12 @@ export interface UserMessagePayload {
 
 // Agent streaming response types
 export interface AgentQueryResponse {
-  type: 'chunk' | 'done' | 'error' | 'approval_required';
+  type: 'chunk' | 'done' | 'error' | 'approval_required' | 'planning_required';
   text?: string;
   fullText?: string;
   error?: string;
   approvalRequest?: ApprovalRequest;
+  planningRequest?: PlanningRequest;
 }
 
 // File state update event
@@ -69,6 +70,33 @@ export interface ApprovalResponse {
   feedback?: string; // Required when rejected
 }
 
+// Planning workflow types (M10)
+export interface PlanningQuestion {
+  id: string; // Unique ID for this question
+  question: string; // The question text
+}
+
+export interface PlanningRequest {
+  toolUseId: string; // Links to API tool_use block
+  questions: PlanningQuestion[];
+}
+
+export interface PlanningResponse {
+  toolUseId: string;
+  answers: Record<string, string>; // Map of question ID → answer
+}
+
+// Compaction types (M12)
+export interface CompactionRequest {
+  messages: Message[];
+}
+
+export interface CompactionResponse {
+  success: boolean;
+  summary?: string;
+  error?: string;
+}
+
 // IPC API exposed to renderer
 export interface IpcApi {
   sendMessage: (message: UserMessagePayload) => void;
@@ -79,4 +107,6 @@ export interface IpcApi {
   onFileCreated: (callback: (event: FileCreatedEvent) => void) => () => void;
   onDirectoryCreated: (callback: (event: DirectoryCreatedEvent) => void) => () => void;
   respondToApproval: (response: ApprovalResponse) => void;
+  respondToPlanning: (response: PlanningResponse) => void;
+  compactConversation: (request: CompactionRequest) => Promise<CompactionResponse>;
 }

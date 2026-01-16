@@ -5,6 +5,7 @@ import { SYSTEM_PROMPT_M6 } from './prompts/systemPrompt';
 import { tools, executeToolCall, completeWrite } from './tools';
 import { ToolExecutionContext } from './ToolExecutionContext';
 import { approvalManager } from './ApprovalManager';
+import { planningManager } from './PlanningManager';
 import { fileSystemManager } from '../vault/FileSystemManager';
 import { fileStateTracker } from '../vault/FileStateTracker';
 
@@ -59,7 +60,11 @@ export class AgentController {
       }
     }
 
-    // No CAMPAIGN.md found - not an error, just means vault doesn't have one yet
+    // M11: No CAMPAIGN.md found - add system note so Gary can offer to help create one
+    messages.push({
+      role: 'user',
+      content: 'Note: No CAMPAIGN.md file found in vault. You can offer to help the user create one using planning mode if they want.',
+    });
   }
 
   /**
@@ -319,8 +324,45 @@ export class AgentController {
                   tool_use_id: block.id,
                   content: finalResult,
                 });
+              } else if (context.needsPlanning() && context.planningRequest) {
+                // Handle planning workflow (M10)
+                // Use actual tool use ID from API
+                context.planningRequest.toolUseId = block.id;
+
+                console.log('[AGENT_CONTROLLER] Planning needed:', {
+                  toolUseId: block.id,
+                  questionCount: context.planningRequest.questions.length,
+                });
+
+                // Yield planning_required to renderer
+                yield {
+                  type: 'planning_required',
+                  planningRequest: context.planningRequest,
+                };
+
+                console.log('[AGENT_CONTROLLER] Waiting for user planning response...');
+
+                // Wait for user response
+                const planningResponse = await planningManager.requestPlanning(
+                  context.planningRequest
+                );
+
+                console.log('[AGENT_CONTROLLER] Received planning response:', {
+                  answerCount: Object.keys(planningResponse.answers).length,
+                });
+
+                // Format answers as tool result
+                const formattedAnswers = context.planningRequest.questions
+                  .map((q) => `Q: ${q.question}\nA: ${planningResponse.answers[q.id] || '(no answer)'}`)
+                  .join('\n\n');
+
+                (toolResults.content as any[]).push({
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  content: `User provided answers:\n\n${formattedAnswers}`,
+                });
               } else {
-                // No approval needed, use result directly
+                // No approval or planning needed, use result directly
                 (toolResults.content as any[]).push({
                   type: 'tool_result',
                   tool_use_id: block.id,

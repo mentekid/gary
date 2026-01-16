@@ -4,6 +4,7 @@ import { markdownParser } from '../../vault/MarkdownParser';
 import { fileStateTracker } from '../../vault/FileStateTracker';
 import type { ToolExecutionContext } from '../ToolExecutionContext';
 import { hasFrontmatter, prependFrontmatter } from '../../vault/markdownUtils';
+import type { PlanningQuestion, PlanningRequest } from '../../../common/types/ipc';
 
 // Tool definitions for Anthropic API
 export const tools: Anthropic.Tool[] = [
@@ -115,6 +116,24 @@ export const tools: Anthropic.Tool[] = [
       required: ['keyword'],
     },
   },
+  {
+    name: 'ask_planning_questions',
+    description: 'Ask the user multiple required questions for planning. Use when you need structured input before proceeding. All questions must be answered.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        questions: {
+          type: 'array',
+          description: 'Array of questions to ask the user',
+          items: {
+            type: 'string',
+          },
+          minItems: 1,
+        },
+      },
+      required: ['questions'],
+    },
+  },
 ];
 
 // Execute a tool call
@@ -138,6 +157,8 @@ export async function executeToolCall(
       return await findFilesTool(toolInput.search_term);
     case 'search_content':
       return await searchContentTool(toolInput.keyword);
+    case 'ask_planning_questions':
+      return await askPlanningQuestionsTool(toolInput.questions, context);
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }
@@ -307,6 +328,7 @@ async function prependFrontmatterTool(path: string): Promise<string> {
     }
 
     const content = await fileSystemManager.readFile(path);
+    fileStateTracker.markRead(path);
 
     // Check if already has frontmatter
     if (hasFrontmatter(content)) {
@@ -416,4 +438,37 @@ async function searchContentTool(keyword: string): Promise<string> {
   } catch (error: any) {
     return `Error searching content: ${error.message}`;
   }
+}
+
+/**
+ * Ask the user multiple planning questions (M10)
+ * Pauses execution until user provides answers
+ */
+async function askPlanningQuestionsTool(
+  questions: string[],
+  context?: ToolExecutionContext
+): Promise<string> {
+  if (!context) {
+    return 'Error: Planning requires execution context';
+  }
+
+  if (!questions || questions.length === 0) {
+    return 'Error: Must provide at least one question';
+  }
+
+  // Generate unique IDs for questions
+  const planningQuestions: PlanningQuestion[] = questions.map((q, idx) => ({
+    id: `q_${idx}`,
+    question: q,
+  }));
+
+  const toolUseId = `planning_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+  const planningRequest: PlanningRequest = {
+    toolUseId,
+    questions: planningQuestions,
+  };
+
+  context.requestPlanning(planningRequest);
+  return '__PLANNING_PENDING__';
 }

@@ -9,6 +9,9 @@ import type {
   SelectVaultResponse,
   ListDirectoryRequest,
   ListDirectoryResponse,
+  PlanningResponse,
+  CompactionRequest,
+  CompactionResponse,
 } from '../common/types/ipc';
 
 // Expose IPC API to renderer via contextBridge
@@ -75,6 +78,14 @@ const ipcApi: IpcApi = {
 
   respondToApproval: (response: import('../common/types/ipc').ApprovalResponse): void => {
     ipcRenderer.send('approval-response', response);
+  },
+
+  respondToPlanning: (response: PlanningResponse): void => {
+    ipcRenderer.send('planning-response', response);
+  },
+
+  compactConversation: (request: CompactionRequest): Promise<CompactionResponse> => {
+    return ipcRenderer.invoke('compact-conversation', request);
   },
 };
 

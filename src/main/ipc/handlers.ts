@@ -1,4 +1,5 @@
 import { ipcMain, dialog } from 'electron';
+import Anthropic from '@anthropic-ai/sdk';
 import { IPC_EVENTS } from './events';
 import {
   UserMessagePayload,
@@ -6,12 +7,16 @@ import {
   ListDirectoryRequest,
   ListDirectoryResponse,
   ApprovalResponse,
+  PlanningResponse,
+  CompactionRequest,
+  CompactionResponse,
 } from '../../common/types/ipc';
 import { fileSystemManager } from '../vault/FileSystemManager';
 import { vaultValidator } from '../vault/VaultValidator';
 import { agentController } from '../agent/AgentController';
 import { fileStateTracker } from '../vault/FileStateTracker';
 import { approvalManager } from '../agent/ApprovalManager';
+import { planningManager } from '../agent/PlanningManager';
 
 export function registerIpcHandlers() {
   // Agent streaming handler - M5
@@ -114,6 +119,92 @@ export function registerIpcHandlers() {
       approvalManager.handleApprovalResponse(response);
     }
   );
+
+  // Planning response handler (M10) - user responds to planning request
+  ipcMain.on(
+    IPC_EVENTS.PLANNING_RESPONSE,
+    (_event, response: PlanningResponse) => {
+      console.log('[IPC_HANDLER] Received planning response:', {
+        toolUseId: response.toolUseId,
+        answerCount: Object.keys(response.answers).length,
+      });
+      planningManager.handlePlanningResponse(response);
+    }
+  );
+
+  // Compact conversation handler (M12) - generate summary of conversation
+  ipcMain.handle(
+    IPC_EVENTS.COMPACT_CONVERSATION,
+    async (_event, request: CompactionRequest): Promise<CompactionResponse> => {
+      try {
+        console.log('[IPC_HANDLER] Starting conversation compaction:', {
+          messageCount: request.messages.length,
+        });
+
+        // Get API key
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+          return {
+            success: false,
+            error: 'ANTHROPIC_API_KEY not found in environment',
+          };
+        }
+
+        const client = new Anthropic({ apiKey });
+
+        // Convert messages to Anthropic format
+        const anthropicMessages: Anthropic.MessageParam[] = request.messages
+          .filter((msg) => msg.role !== 'summary') // Exclude existing summaries
+          .map((msg) => ({
+            role: msg.role === 'user' ? 'user' : 'assistant',
+            content: msg.content,
+          }));
+
+        // Request summary from Claude
+        const response = await client.messages.create({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 2000,
+          messages: [
+            {
+              role: 'user',
+              content: `You are helping summarize a conversation between a user and Gary, an AI assistant for D&D Dungeon Masters.
+
+Please create a concise summary of the conversation history provided below. The summary should preserve:
+1. The user's initial and current goals
+2. Key decisions that were made
+3. Files that were modified or created
+4. Important context for continuing the conversation
+5. Next topics or pending tasks
+
+Format the summary in markdown with clear sections. Be concise but preserve all critical information.
+
+Here is the conversation history:
+
+${anthropicMessages.map((msg, i) => `[${msg.role.toUpperCase()}]:\n${msg.content}\n`).join('\n---\n\n')}`,
+            },
+          ],
+        });
+
+        const summaryContent =
+          response.content[0].type === 'text' ? response.content[0].text : '';
+
+        console.log('[IPC_HANDLER] Compaction completed:', {
+          summaryLength: summaryContent.length,
+        });
+
+        return {
+          success: true,
+          summary: summaryContent,
+        };
+      } catch (error: any) {
+        console.error('[IPC_HANDLER] Compaction failed:', error);
+        return {
+          success: false,
+          error: error.message || 'Failed to compact conversation',
+        };
+      }
+    }
+  );
 }
 
 export function unregisterIpcHandlers() {
@@ -121,4 +212,6 @@ export function unregisterIpcHandlers() {
   ipcMain.removeHandler(IPC_EVENTS.SELECT_VAULT);
   ipcMain.removeHandler(IPC_EVENTS.LIST_DIRECTORY);
   ipcMain.removeAllListeners(IPC_EVENTS.APPROVAL_RESPONSE);
+  ipcMain.removeAllListeners(IPC_EVENTS.PLANNING_RESPONSE);
+  ipcMain.removeHandler(IPC_EVENTS.COMPACT_CONVERSATION);
 }

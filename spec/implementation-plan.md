@@ -108,6 +108,10 @@ Gary is a Dungeon Master assistant desktop app for D&D 5e campaigns.
 - Resumable sessions: Dump entire session to file when exiting, give user ability to resume
 - File viewer: Allow user to open a file (read only) from the side pane into a new tab (chat tab always first, additional tabs optional)
 
+**M14: Better agent**
+- Edit tool: Instead of rewriting the full file, edit specific lines
+- 
+
 ## Tool Specifications
 
 ### list_directory(path, recursive=false)

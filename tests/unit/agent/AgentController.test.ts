@@ -7,11 +7,13 @@ import * as os from 'os';
 vi.mock('@anthropic-ai/sdk');
 vi.mock('@main/agent/tools');
 vi.mock('@main/agent/prompts/systemPrompt');
+vi.mock('@main/agent/PlanningManager');
 
 import { AgentController } from '@main/agent/AgentController';
 import { executeToolCall } from '@main/agent/tools';
 import { fileSystemManager } from '@main/vault/FileSystemManager';
 import { fileStateTracker } from '@main/vault/FileStateTracker';
+import { planningManager } from '@main/agent/PlanningManager';
 
 describe('AgentController', () => {
   let controller: AgentController;
@@ -84,6 +86,11 @@ describe('AgentController', () => {
   it('prevents infinite loops with max turns limit', async () => {
     vi.mocked(executeToolCall).mockResolvedValue('Result');
 
+    // Mock planningManager to respond "no" when asked to continue
+    vi.mocked(planningManager.requestPlanning).mockResolvedValue({
+      answers: { continue: 'no' },
+    });
+
     // Always return tool use (would loop forever without limit)
     mockCreate.mockResolvedValue({
       content: [
@@ -97,11 +104,14 @@ describe('AgentController', () => {
       responses.push(r);
     }
 
-    const errorResponse = responses.find(r => r.type === 'error');
-    expect(errorResponse).toEqual({
-      type: 'error',
-      error: 'Maximum conversation turns reached',
-    });
+    // Should get a planning_required asking to continue
+    const planningResponse = responses.find(r => r.type === 'planning_required');
+    expect(planningResponse).toBeDefined();
+    expect((planningResponse as any).planningRequest.questions[0].question).toContain('Should I continue');
+
+    // Should end with done (not error) after user says no
+    const doneResponse = responses.find(r => r.type === 'done');
+    expect(doneResponse).toBeDefined();
   });
 
   it('continues agentic loop when tools are used', async () => {

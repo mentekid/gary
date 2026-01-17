@@ -11,4 +11,5 @@ export const IPC_EVENTS = {
   DIRECTORY_CREATED: 'directory-created', // Directory created by agent
   FILE_DELETED: 'file-deleted', // File deleted by agent (future)
   COMPACT_CONVERSATION: 'compact-conversation', // M12: User requests conversation compaction
+  ABORT_QUERY: 'abort-query', // User cancels in-progress request
 } as const;

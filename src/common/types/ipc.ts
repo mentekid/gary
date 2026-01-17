@@ -109,4 +109,5 @@ export interface IpcApi {
   respondToApproval: (response: ApprovalResponse) => void;
   respondToPlanning: (response: PlanningResponse) => void;
   compactConversation: (request: CompactionRequest) => Promise<CompactionResponse>;
+  abortQuery: () => void;
 }

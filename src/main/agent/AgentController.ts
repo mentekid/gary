@@ -12,10 +12,21 @@ import { fileStateTracker } from '../vault/FileStateTracker';
 export class AgentController {
   private anthropic: Anthropic;
   private apiKey: string;
+  private abortController: AbortController | null = null;
 
   constructor() {
     this.apiKey = this.getApiKey();
     this.anthropic = new Anthropic({ apiKey: this.apiKey });
+  }
+
+  /**
+   * Abort the current query if one is in progress
+   */
+  abort(): void {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
   }
 
   private getApiKey(): string {
@@ -190,6 +201,11 @@ export class AgentController {
   }
 
   async *query(request: AgentQueryRequest): AsyncGenerator<AgentQueryResponse> {
+    // Create abort controller for this query
+    this.abortController = new AbortController();
+    const signal = this.abortController.signal;
+    let accumulatedText = '';
+
     try {
       // Build message history for API
       const messages: Anthropic.MessageParam[] = request.conversationHistory
@@ -212,10 +228,50 @@ export class AgentController {
 
       // Agentic loop - continue until we get a final text response
       let continueLoop = true;
-      const maxTurns = 10;
+      const maxTurns = 25;
       let turnCount = 0;
 
-      while (continueLoop && turnCount < maxTurns) {
+      while (continueLoop) {
+        // Check if aborted
+        if (signal.aborted) {
+          yield { type: 'done', fullText: accumulatedText + '\n\n*[Request cancelled]*' };
+          break;
+        }
+
+        // Check turn limit and ask user if they want to continue
+        if (turnCount >= maxTurns) {
+          const continueRequest = {
+            toolUseId: `turn-limit-${Date.now()}`,
+            questions: [
+              {
+                id: 'continue',
+                question: `Gary has used ${maxTurns} turns. Should I continue working on this task?`,
+              },
+            ],
+          };
+
+          // Yield planning_required to ask user
+          yield {
+            type: 'planning_required',
+            planningRequest: continueRequest,
+          };
+
+          // Wait for user response
+          const continueResponse = await planningManager.requestPlanning(continueRequest);
+          const answer = continueResponse.answers['continue']?.toLowerCase() || '';
+
+          // Check if user wants to continue
+          if (answer.includes('yes') || answer.includes('continue') || answer.includes('go on')) {
+            // Reset turn counter and continue
+            turnCount = 0;
+          } else {
+            // User wants to stop - yield done with accumulated text
+            yield { type: 'done', fullText: accumulatedText };
+            continueLoop = false;
+            break;
+          }
+        }
+
         turnCount++;
 
         // Call API with tools
@@ -234,6 +290,7 @@ export class AgentController {
         for (const block of response.content) {
           if (block.type === 'text') {
             textContent += block.text;
+            accumulatedText += block.text;
             // Stream text chunks (simulate streaming by yielding in parts)
             yield { type: 'chunk', text: block.text };
           } else if (block.type === 'tool_use') {
@@ -388,19 +445,20 @@ export class AgentController {
         });
         messages.push(toolResults);
       }
-
-      if (turnCount >= maxTurns) {
+    } catch (error: any) {
+      // Don't yield error if aborted - it was intentional
+      if (signal.aborted) {
+        yield { type: 'done', fullText: accumulatedText + '\n\n*[Request cancelled]*' };
+      } else {
+        console.error('Agent query error:', error);
         yield {
           type: 'error',
-          error: 'Maximum conversation turns reached',
+          error: error.message || 'Failed to query agent',
         };
       }
-    } catch (error: any) {
-      console.error('Agent query error:', error);
-      yield {
-        type: 'error',
-        error: error.message || 'Failed to query agent',
-      };
+    } finally {
+      // Clean up abort controller
+      this.abortController = null;
     }
   }
 }

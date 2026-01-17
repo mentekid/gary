@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { ApprovalRequest } from '../../common/types/ipc';
+import type { ApprovalRequest, Message } from '../../common/types/ipc';
+import { useChatStore } from '../store/chatStore';
 
 /**
  * Hook to manage approval workflow state (M8)
@@ -16,6 +17,15 @@ export function useApprovalListener() {
   const handleApprove = () => {
     if (!pendingApproval) return;
 
+    // Add approval message to chat store for visibility
+    const approvalMessage: Message = {
+      id: `approval-${Date.now()}`,
+      role: 'user',
+      content: `**Approved:** Writing to \`${pendingApproval.filePath}\``,
+      timestamp: Date.now(),
+    };
+    useChatStore.getState().addMessage(approvalMessage);
+
     window.ipc.respondToApproval({
       toolUseId: pendingApproval.toolUseId,
       approved: true,
@@ -26,6 +36,15 @@ export function useApprovalListener() {
 
   const handleReject = (feedback: string) => {
     if (!pendingApproval) return;
+
+    // Add rejection message to chat store for visibility
+    const rejectionMessage: Message = {
+      id: `rejection-${Date.now()}`,
+      role: 'user',
+      content: `**Rejected:** Writing to \`${pendingApproval.filePath}\`\n**Feedback:** ${feedback}`,
+      timestamp: Date.now(),
+    };
+    useChatStore.getState().addMessage(rejectionMessage);
 
     window.ipc.respondToApproval({
       toolUseId: pendingApproval.toolUseId,

@@ -132,6 +132,12 @@ export function registerIpcHandlers() {
     }
   );
 
+  // Abort query handler - cancel in-progress request
+  ipcMain.on(IPC_EVENTS.ABORT_QUERY, () => {
+    console.log('[IPC_HANDLER] Abort query requested');
+    agentController.abort();
+  });
+
   // Compact conversation handler (M12) - generate summary of conversation
   ipcMain.handle(
     IPC_EVENTS.COMPACT_CONVERSATION,
@@ -213,5 +219,6 @@ export function unregisterIpcHandlers() {
   ipcMain.removeHandler(IPC_EVENTS.LIST_DIRECTORY);
   ipcMain.removeAllListeners(IPC_EVENTS.APPROVAL_RESPONSE);
   ipcMain.removeAllListeners(IPC_EVENTS.PLANNING_RESPONSE);
+  ipcMain.removeAllListeners(IPC_EVENTS.ABORT_QUERY);
   ipcMain.removeHandler(IPC_EVENTS.COMPACT_CONVERSATION);
 }

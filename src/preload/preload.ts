@@ -87,6 +87,10 @@ const ipcApi: IpcApi = {
   compactConversation: (request: CompactionRequest): Promise<CompactionResponse> => {
     return ipcRenderer.invoke('compact-conversation', request);
   },
+
+  abortQuery: (): void => {
+    ipcRenderer.send('abort-query');
+  },
 };
 
 contextBridge.exposeInMainWorld('ipc', ipcApi);

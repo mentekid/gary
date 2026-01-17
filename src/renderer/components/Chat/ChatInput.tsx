@@ -32,6 +32,10 @@ function ChatInput() {
     }
   };
 
+  const handleStop = () => {
+    window.ipc.abortQuery();
+  };
+
   // Auto-resize textarea based on content
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -59,13 +63,23 @@ function ChatInput() {
           className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 resize-none overflow-y-auto disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ minHeight: '48px', maxHeight: '200px' }}
         />
-        <button
-          type="submit"
-          disabled={!input.trim() || isStreaming || isContextFull}
-          className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap"
-        >
-          {isStreaming ? 'Thinking...' : 'Send'}
-        </button>
+        {isStreaming ? (
+          <button
+            type="button"
+            onClick={handleStop}
+            className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap"
+          >
+            Stop
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={!input.trim() || isContextFull}
+            className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap"
+          >
+            Send
+          </button>
+        )}
       </div>
       <p className="text-xs text-gray-500 mt-2">
         {isContextFull ? (

@@ -221,6 +221,11 @@ async function writeTool(
       hasContext: !!context,
     });
 
+    // Validate content is provided
+    if (!content) {
+      return `Error: No content provided for write to ${path}. You must provide the full file content in the 'content' parameter.`;
+    }
+
     // Check if file exists
     const fileExists = await fileSystemManager.fileExists(path);
 

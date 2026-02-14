@@ -277,7 +277,7 @@ export class AgentController {
         // Call API with tools
         const response = await this.anthropic.messages.create({
           model: 'claude-sonnet-4-5-20250929',
-          max_tokens: 4096,
+          max_tokens: 16384,
           system: SYSTEM_PROMPT_M6,
           messages,
           tools,
@@ -303,6 +303,27 @@ export class AgentController {
           yield { type: 'done', fullText: textContent };
           continueLoop = false;
           break;
+        }
+
+        // Handle truncated responses - tool call inputs may be incomplete
+        if (response.stop_reason === 'max_tokens') {
+          const responseChars = response.content
+            .map(b => b.type === 'text' ? b.text.length : JSON.stringify(b.input).length)
+            .reduce((a, b) => a + b, 0);
+          console.warn(`[AGENT_CONTROLLER] Response truncated (max_tokens hit, ~${responseChars} chars), asking model to retry concisely`);
+
+          // Add a compact placeholder so the model knows what happened, without replaying 16k of truncated content
+          messages.push({
+            role: 'assistant',
+            content: `<truncated — response was ${responseChars} characters and hit the token limit>`,
+          });
+          messages.push({
+            role: 'user',
+            content: 'Your previous response was cut off because it was too long. Your tool call was incomplete and could not be executed. Please try again, but be much more concise — keep the content shorter and focused on the essentials.',
+          });
+
+          // Skip processing the truncated tool calls, loop back to API
+          continue;
         }
 
         // Add spacing after text blocks when there's tool use

@@ -58,7 +58,7 @@ export const tools: Anthropic.Tool[] = [
   },
   {
     name: 'write',
-    description: 'Create or modify a file. MUST call read() first for existing files. Writes content atomically.',
+    description: 'Create or modify a file. MUST call read() first for existing files. Writes content atomically. For small changes to existing files, prefer edit() over write().',
     input_schema: {
       type: 'object',
       properties: {
@@ -72,6 +72,32 @@ export const tools: Anthropic.Tool[] = [
         },
       },
       required: ['path', 'content'],
+    },
+  },
+  {
+    name: 'edit',
+    description: 'Replace specific lines in a file. Lines are 1-indexed and match the L-prefixed numbers shown by read(). MUST call read() first. Requires user approval.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'Relative path to file',
+        },
+        start_line: {
+          type: 'number',
+          description: 'First line to replace (1-indexed, inclusive)',
+        },
+        end_line: {
+          type: 'number',
+          description: 'Last line to replace (1-indexed, inclusive)',
+        },
+        content: {
+          type: 'string',
+          description: 'Replacement content. To delete lines, pass empty string. To insert, use same line for start and end with original line plus new lines.',
+        },
+      },
+      required: ['path', 'start_line', 'end_line', 'content'],
     },
   },
   {
@@ -151,6 +177,8 @@ export async function executeToolCall(
       return await readTool(toolInput.path);
     case 'write':
       return await writeTool(toolInput.path, toolInput.content, context);
+    case 'edit':
+      return await editTool(toolInput.path, toolInput.start_line, toolInput.end_line, toolInput.content, context);
     case 'prepend_frontmatter':
       return await prependFrontmatterTool(toolInput.path);
     case 'find_files':
@@ -201,7 +229,11 @@ async function readTool(path: string): Promise<string> {
     // Track that we read this file
     fileStateTracker.markRead(path);
 
-    return content;
+    // Prefix each line with L{n}| for unambiguous line references
+    const lines = content.split('\n');
+    const numbered = lines.map((line, i) => `L${i + 1}|${line}`).join('\n');
+
+    return numbered;
   } catch (error: any) {
     return `Error reading file: ${error.message}`;
   }
@@ -276,6 +308,75 @@ async function writeTool(
     return `Successfully wrote ${bytesWritten} bytes to ${path}`;
   } catch (error: any) {
     return `Error writing file: ${error.message}`;
+  }
+}
+
+async function editTool(
+  path: string,
+  startLine: number,
+  endLine: number,
+  content: string,
+  context?: ToolExecutionContext
+): Promise<string> {
+  try {
+    // Validate file exists
+    const fileExists = await fileSystemManager.fileExists(path);
+    if (!fileExists) {
+      return `Error: File ${path} does not exist. edit() can only modify existing files.`;
+    }
+
+    // Validation: Must read existing files before editing
+    const currentState = fileStateTracker.getState(path);
+    if (currentState === 'not_accessed' || currentState === 'peeked') {
+      return `Error: Must read() file ${path} before editing. Current state: ${currentState}`;
+    }
+
+    // Validate line numbers
+    if (startLine < 1) {
+      return `Error: start_line must be >= 1, got ${startLine}`;
+    }
+    if (endLine < startLine) {
+      return `Error: end_line (${endLine}) must be >= start_line (${startLine})`;
+    }
+
+    // Read current file content
+    const beforeContent = await fileSystemManager.readFile(path);
+    const lines = beforeContent.split('\n');
+
+    if (startLine > lines.length) {
+      return `Error: start_line (${startLine}) is beyond end of file (${lines.length} lines)`;
+    }
+    if (endLine > lines.length) {
+      return `Error: end_line (${endLine}) is beyond end of file (${lines.length} lines)`;
+    }
+
+    // Build new content: lines before + replacement + lines after
+    const linesBefore = lines.slice(0, startLine - 1);
+    const linesAfter = lines.slice(endLine);
+    const replacementLines = content === '' ? [] : content.split('\n');
+    const afterContent = [...linesBefore, ...replacementLines, ...linesAfter].join('\n');
+
+    // Submit through approval workflow (same as write)
+    if (context) {
+      const toolUseId = `edit_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+      const approvalRequest = {
+        toolUseId,
+        filePath: path,
+        beforeContent,
+        afterContent,
+      };
+
+      context.requestApproval(approvalRequest);
+      return '__APPROVAL_PENDING__';
+    }
+
+    // No approval context — write directly
+    const bytesWritten = await fileSystemManager.writeFile(path, afterContent);
+    fileStateTracker.markModified(path);
+    return `Successfully edited ${path} (lines ${startLine}-${endLine}), ${bytesWritten} bytes written`;
+  } catch (error: any) {
+    return `Error editing file: ${error.message}`;
   }
 }
 

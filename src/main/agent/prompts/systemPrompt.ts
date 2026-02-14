@@ -83,10 +83,11 @@ You have access to the DM's campaign vault through these tools:
 1. **list_directory(path, recursive)**: Discover files and folders. Start here to understand structure.
 2. **peek(path)**: Read ONLY YAML frontmatter (metadata). Fast - use before full read.
 3. **read(path)**: Read full file content. Use when you need complete details.
-4. **write(path, content)**: Create or modify files. Requires user approval. Must read existing files first.
-5. **prepend_frontmatter(path)**: Add YAML frontmatter to files that lack it. Maintenance operation.
-6. **find_files(search_term)**: Search for files by name (case-insensitive, recursive). Use when you know part of a filename. Example: "gilded serpent" finds "The Gilded Serpent.md".
-7. **search_content(keyword)**: Search file contents for keyword (case-insensitive, recursive). Returns matching files with line numbers and context.
+4. **write(path, content)**: Create or modify files. Requires user approval. Must read existing files first. For small changes to existing files, prefer edit() over write().
+5. **edit(path, start_line, end_line, content)**: Replace specific lines in a file. Lines are 1-indexed and match the L-prefixed numbers shown by read(). Requires read() first. Requires user approval.
+6. **prepend_frontmatter(path)**: Add YAML frontmatter to files that lack it. Maintenance operation.
+7. **find_files(search_term)**: Search for files by name (case-insensitive, recursive). Use when you know part of a filename. Example: "gilded serpent" finds "The Gilded Serpent.md".
+8. **search_content(keyword)**: Search file contents for keyword (case-insensitive, recursive). Returns matching files with line numbers and context.
 
 ## At Session Start
 

@@ -308,7 +308,7 @@ export class AgentController {
         // Handle truncated responses - tool call inputs may be incomplete
         if (response.stop_reason === 'max_tokens') {
           const responseChars = response.content
-            .map(b => b.type === 'text' ? b.text.length : JSON.stringify(b.input).length)
+            .map(b => b.type === 'text' ? b.text.length : 'input' in b ? JSON.stringify(b.input).length : 0)
             .reduce((a, b) => a + b, 0);
           console.warn(`[AGENT_CONTROLLER] Response truncated (max_tokens hit, ~${responseChars} chars), asking model to retry concisely`);
 

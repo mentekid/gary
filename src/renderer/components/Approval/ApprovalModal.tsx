@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { structuredPatch } from 'diff';
 import type { ApprovalRequest } from '../../../common/types/ipc';
 
 interface ApprovalModalProps {
@@ -38,13 +39,55 @@ function ApprovalModal({ request, onApprove, onReject }: ApprovalModalProps) {
 
   const isNewFile = request.beforeContent === null;
 
+  const diffLines = useMemo(() => {
+    const before = request.beforeContent ?? '';
+    const after = request.afterContent ?? '';
+    const patch = structuredPatch(
+      request.filePath,
+      request.filePath,
+      before,
+      after,
+      '',
+      '',
+      { context: 5 }
+    );
+
+    const lines: Array<{ type: 'context' | 'add' | 'remove' | 'hunk-header'; text: string; lineNo?: string }> = [];
+
+    for (const hunk of patch.hunks) {
+      lines.push({
+        type: 'hunk-header',
+        text: `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`,
+      });
+
+      let oldLine = hunk.oldStart;
+      let newLine = hunk.newStart;
+
+      for (const line of hunk.lines) {
+        if (line.startsWith('+')) {
+          lines.push({ type: 'add', text: line.substring(1), lineNo: `${newLine}` });
+          newLine++;
+        } else if (line.startsWith('-')) {
+          lines.push({ type: 'remove', text: line.substring(1), lineNo: `${oldLine}` });
+          oldLine++;
+        } else {
+          lines.push({ type: 'context', text: line.substring(1), lineNo: `${newLine}` });
+          oldLine++;
+          newLine++;
+        }
+      }
+    }
+
+    return lines;
+  }, [request]);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="border-b border-gray-700 p-6">
           <h2 className="text-xl font-semibold text-white mb-2">
-            Approve File Write
+            Approve File {isNewFile ? 'Create' : 'Edit'}
           </h2>
           <p className="text-sm text-gray-400 font-mono">
             {request.filePath}
@@ -54,33 +97,41 @@ function ApprovalModal({ request, onApprove, onReject }: ApprovalModalProps) {
           )}
         </div>
 
-        {/* Diff Viewer */}
-        <div className="flex-1 overflow-hidden flex">
-          {/* Before */}
-          <div className="flex-1 flex flex-col border-r border-gray-700">
-            <div className="bg-gray-800 px-4 py-2 border-b border-gray-700">
-              <h3 className="text-sm font-medium text-gray-300">
-                {isNewFile ? '(new file)' : 'Before'}
-              </h3>
-            </div>
-            <div className="flex-1 overflow-auto p-4 bg-gray-950">
-              <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
-                {isNewFile ? '' : request.beforeContent}
-              </pre>
-            </div>
-          </div>
+        {/* Unified Diff Viewer */}
+        <div className="flex-1 overflow-auto bg-gray-950 font-mono text-sm">
+          {diffLines.map((line, i) => {
+            if (line.type === 'hunk-header') {
+              return (
+                <div key={i} className="bg-gray-800 text-purple-400 px-4 py-1 border-y border-gray-700">
+                  {line.text}
+                </div>
+              );
+            }
 
-          {/* After */}
-          <div className="flex-1 flex flex-col">
-            <div className="bg-gray-800 px-4 py-2 border-b border-gray-700">
-              <h3 className="text-sm font-medium text-gray-300">After</h3>
-            </div>
-            <div className="flex-1 overflow-auto p-4 bg-gray-950">
-              <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
-                {request.afterContent}
-              </pre>
-            </div>
-          </div>
+            const bgClass =
+              line.type === 'add' ? 'bg-green-900/30' :
+              line.type === 'remove' ? 'bg-red-900/30' :
+              '';
+            const textClass =
+              line.type === 'add' ? 'text-green-300' :
+              line.type === 'remove' ? 'text-red-300' :
+              'text-gray-400';
+            const prefix =
+              line.type === 'add' ? '+' :
+              line.type === 'remove' ? '-' :
+              ' ';
+
+            return (
+              <div key={i} className={`${bgClass} flex`}>
+                <span className="w-12 shrink-0 text-right pr-2 text-gray-600 select-none border-r border-gray-800 px-1">
+                  {line.lineNo}
+                </span>
+                <span className={`${textClass} pl-2 whitespace-pre-wrap flex-1`}>
+                  {prefix} {line.text}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Footer with Actions */}

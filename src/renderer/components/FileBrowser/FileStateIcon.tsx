@@ -1,3 +1,4 @@
+import React from 'react';
 import { FileState } from '../../../common/types/vault';
 
 interface FileStateIconProps {

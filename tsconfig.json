@@ -3,7 +3,7 @@
     "jsx": "react",
     "target": "ES2022",
     "module": "commonjs",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
@@ -15,5 +15,7 @@
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./src"
-  }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "tests"]
 }

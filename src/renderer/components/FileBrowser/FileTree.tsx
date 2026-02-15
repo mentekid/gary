@@ -10,7 +10,7 @@ const HEADER_HEIGHT = 120; // App header height in pixels
 function FolderIcon({ isOpen }: { isOpen: boolean }) {
   return (
     <svg
-      className="w-4 h-4 text-gray-400"
+      className="w-4 h-4 flex-shrink-0 text-gray-400"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -38,7 +38,7 @@ function FileIcon({ extension }: { extension?: string }) {
   const isMarkdown = extension === 'md';
   return (
     <svg
-      className={`w-4 h-4 ${isMarkdown ? 'text-purple-500' : 'text-gray-500'}`}
+      className={`w-4 h-4 flex-shrink-0 ${isMarkdown ? 'text-purple-500' : 'text-gray-500'}`}
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -88,7 +88,7 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
     >
       {/* Expand/collapse arrow for directories */}
       {isDirectory && (
-        <span className="w-4 flex items-center justify-center">
+        <span className="w-4 flex-shrink-0 flex items-center justify-center">
           {node.isOpen ? (
             <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
               <path
@@ -108,7 +108,7 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
           )}
         </span>
       )}
-      {!isDirectory && <span className="w-4" />}
+      {!isDirectory && <span className="w-4 flex-shrink-0" />}
 
       {/* Icon */}
       {isDirectory ? (
